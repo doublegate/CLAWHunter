@@ -33,17 +33,18 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 
 ```
 CLAWHunter/
+├── docs/
+│   └── V3-RESEARCH.md                ← Protocol research, feature specs, stretch goals
 ├── lib/
 │   └── common.sh                     ← Shared library (LED, audio, fingerprinting, harvest trigger)
-├── payloads/
-│   ├── user/clawhunter/
-│   │   ├── payload.sh                ← Interactive payload (all features)
-│   │   └── harvest.py                ← Post-exploitation harvest engine (Python3, stdlib-only)
-│   ├── recon/clawhunter/
-│   │   └── payload.sh                ← Recon variant (RF-first, auto-connect)
-│   └── alert/clawhunter-watchdog/
-│       └── payload.sh                ← Alert variant (auto-fires, <5s, silent)
-└── payload.sh                        ← Legacy v2.1.0 single-file payload (reference only)
+└── payloads/
+    ├── user/clawhunter/
+    │   ├── payload.sh                ← Interactive payload (all features)
+    │   └── harvest.py                ← Post-exploitation harvest engine (Python3, stdlib-only)
+    ├── recon/clawhunter/
+    │   └── payload.sh                ← Recon variant (RF-first, auto-connect)
+    └── alert/clawhunter-watchdog/
+        └── payload.sh                ← Alert variant (auto-fires, <5s, silent)
 ```
 
 ---
