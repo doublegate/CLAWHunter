@@ -1,0 +1,10 @@
+# Loot / scan output (never commit scan results)
+*.log
+loot/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
