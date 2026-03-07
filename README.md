@@ -9,6 +9,10 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 
 ---
 
+![CLAWHunter Architecture](images/architecture.png)
+
+---
+
 ## Contents
 
 1. [Repository structure](#repository-structure)
