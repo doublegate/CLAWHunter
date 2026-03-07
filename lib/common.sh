@@ -26,6 +26,10 @@
 mkdir -p "$LOOT_BASE"
 
 # ── LED control ───────────────────────────────────────────────────────────────
+# HAK5_API_POST is an internal Pager helper defined in /lib/hak5/commands.sh
+# (sourced above). It is not a documented DuckyScript command but is provided
+# by the Pager firmware. If absent, all LED calls fail silently via || true —
+# the payload continues working without LED feedback.
 
 _led() { HAK5_API_POST "system/led" "$1" >/dev/null 2>&1 || true; }
 
@@ -105,17 +109,17 @@ ws_probe() {
     local WS_REQ="GET / HTTP/1.1\r\nHost: ${ip}:${port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
     local resp=""
 
-    # Try /dev/tcp first (no subprocess overhead) — may be disabled in some OpenWRT bash builds
-    if [ -e /dev/tcp ] || (exec 3<>/dev/tcp/127.0.0.1/1 2>/dev/null); then
-        resp=$(timeout 3 bash -c "
-            exec 3<>/dev/tcp/${ip}/${port} 2>/dev/null || exit 1
-            printf '${WS_REQ}' >&3
-            timeout 2 cat <&3 2>/dev/null
-            exec 3>&-
-        " 2>/dev/null)
-    fi
+    # Try /dev/tcp (bash built-in, no subprocess). Not a filesystem path —
+    # the guard [ -e /dev/tcp ] is always false on Linux; just attempt and
+    # let the inner exit 1 handle failure if bash was built without net support.
+    resp=$(timeout 3 bash -c "
+        exec 3<>/dev/tcp/${ip}/${port} 2>/dev/null || exit 1
+        printf '${WS_REQ}' >&3
+        timeout 2 cat <&3 2>/dev/null
+        exec 3>&-
+    " 2>/dev/null)
 
-    # Fallback: nc (always available on the Pager — used by v2.x already)
+    # Fallback: nc (always available on the Pager)
     if [ -z "$resp" ] && command -v nc >/dev/null 2>&1; then
         resp=$(printf "${WS_REQ}" | nc -w 3 "$ip" "$port" 2>/dev/null)
     fi

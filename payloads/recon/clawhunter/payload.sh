@@ -103,7 +103,7 @@ sleep 1
 PASS=""
 ENC_LC=$(echo "${ENC:-open}" | tr '[:upper:]' '[:lower:]')
 if ! echo "$ENC_LC" | grep -qE '^(open|none|)$'; then
-    # DuckyScript has no free-text picker — password must be pre-stored or
+    # TEXT_PICKER exists but is impractical for passwords (5-button char-by-char input) —
     # the AP pre-joined. Notify user and attempt connection with empty password
     # (works if credentials are already saved on the Pager).
     LOG red "Encrypted AP: $SSID"

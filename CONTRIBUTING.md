@@ -22,7 +22,7 @@ The Pager runs OpenWRT with a busybox userland. All shell code must work within 
 | `grep -oP` (PCRE) | `awk` for field extraction |
 | `shuf` | `awk -v seed=$RANDOM 'BEGIN{srand(seed)}…'` |
 | `/dev/tcp` alone | `/dev/tcp` with `nc -w 3` fallback |
-| `TEXT_PICKER` | Display instructions; use Recon context vars |
+| `TEXT_PICKER` for passwords / tokens | Display instructions instead — `TEXT_PICKER` works but requires character-by-character physical button input, which is impractical for long strings |
 | `pip` / third-party Python | Python3 stdlib only |
 | `python3 -c "import X"` where X is not stdlib | Not supported |
 

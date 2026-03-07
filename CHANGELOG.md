@@ -66,8 +66,8 @@ All notable changes to CLAWHunter are documented here.
 ### Fixed (OpenWRT/busybox compatibility)
 - `grep -oP` → `awk` (busybox grep has no PCRE `-P` flag)
 - `shuf` → awk PRNG (`awk -v seed=$RANDOM 'BEGIN{srand(seed)}…'`) — `shuf` not present on OpenWRT
-- `/dev/tcp` TCP probes → `nc -w 3` fallback (Pager kernel may have `/dev/tcp` disabled)
-- Removed `TEXT_PICKER` usage — DuckyScript has no free-text input primitive; replaced with instructional display messages
+- `/dev/tcp` TCP probes — guard condition removed; `/dev/tcp` attempted directly with `nc` fallback on empty response
+- `TEXT_PICKER` replaced with instructional messages — the command exists and is valid DuckyScript, but character-by-character 5-button entry is impractical for passwords and API tokens
 
 ---
 

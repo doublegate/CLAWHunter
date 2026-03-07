@@ -139,7 +139,7 @@ If using the out-of-band exfil feature, uncomment and fill in the constants near
 # EXFIL_WEBHOOK_URL="" # Alternative: HTTPS webhook URL
 ```
 
-> DuckyScript has no free-text input primitive, so credentials cannot be entered interactively. All config must be set before deployment.
+> `TEXT_PICKER` exists in DuckyScript but works character-by-character using the 5 physical buttons — impractical for passwords and API tokens. All credentials must be pre-configured before deployment.
 
 ---
 
@@ -194,7 +194,7 @@ Launch from **Payloads → user → clawhunter** in the Pager UI.
 
 ### WiFi client mode — note on password entry
 
-DuckyScript has no free-text input primitive, so SSID and password cannot be entered interactively at runtime.
+`TEXT_PICKER` is a valid DuckyScript command but requires character-by-character input using the 5 physical buttons — workable for short strings, but impractical for SSIDs, passwords, and API tokens.
 
 - **SSID:** Launch from the **Recon UI** with a target AP selected — the payload reads `_RECON_SELECTED_AP_SSID` automatically.
 - **Password:** Pre-save the AP credentials via the Pager's WiFi Settings before running. The payload connects using saved credentials. If credentials are not saved and the AP is encrypted, a notice is shown and the connection is attempted anyway (may fail).
@@ -574,7 +574,7 @@ The shared library must be at `/root/payloads/lib/common.sh`. Each payload sourc
 The Pager may not have `macchanger` installed. `lib/common.sh` falls back to `ip link set dev <iface> address <mac>` automatically. If both fail, the scan proceeds with the real MAC and a warning is logged.
 
 ### WiFi client mode — cannot connect to encrypted AP
-DuckyScript has no free-text input, so passwords cannot be entered at runtime. Pre-save the AP credentials in the Pager's WiFi Settings before launching the payload. If credentials are not saved, the connection attempt will fail and the payload will log a notice and exit.
+`TEXT_PICKER` exists in DuckyScript but is character-by-character via physical buttons — impractical for passwords. Pre-save the AP credentials in the Pager's WiFi Settings before launching the payload. If credentials are not saved, the connection attempt will fail and the payload will log a notice and exit.
 
 ### Harvest hangs / no output
 The victim gateway may be slow or the session may have stalled. The harvest engine enforces per-turn timeouts (20–60s) and a 3-minute global session ceiling. If it's still running past 3 minutes, check `/root/loot/clawhunter/harvest_*.log` for partial output.
@@ -600,7 +600,7 @@ For full version details with dates and breaking changes: [`CHANGELOG.md`](CHANG
 | **v3.1.0** | Multi-turn agent session (5 turns, single persistent WS connection). Agent-native tool exploitation: `memory_search`, `sessions_list`, `sessions_history`, `nodes`. Out-of-band exfil via Telegram bot or webhook (Turn 5, optional). Improved streaming parser handles all `event.payload` shapes and all terminal `res` statuses. |
 | **v3.0.3** | Per-profile timing dither (`$RANDOM`-based, busybox-compatible) for two-axis IDS evasion. Dead `hashlib` import removed from `harvest.py`. |
 | **v3.0.2** | Integrated harvest module (`harvest.py`): stdlib-only Python3, three-phase (auth probe → HTTP harvest → multi-turn agent session). Triggered from results browser with RIGHT key. |
-| **v3.0.1** | OpenWRT/busybox compatibility: `grep -oP` → `awk`, `shuf` → awk PRNG, `/dev/tcp` + `nc` fallback, `TEXT_PICKER` removed (DuckyScript limitation). |
+| **v3.0.1** | OpenWRT/busybox compatibility: `grep -oP` → `awk`, `shuf` → awk PRNG, `/dev/tcp` + `nc` fallback, `TEXT_PICKER` replaced with instructional messages (character-by-character button input is impractical for passwords/tokens). |
 | **v3.0.0** | Three-payload suite (`user` / `recon` / `alert`) with shared `lib/common.sh`. WebSocket upgrade probe (~99% accuracy). Canvas path probe (`/__openclaw__/canvas/`, `/__openclaw__/a2ui/`). `/agent/status` intel extraction. Continuous mDNS monitor with countdown. ARP cache pre-harvest. JSON report output. MAC randomization. GHOST/QUIET/NORMAL/FAST/AGGRESSIVE scan profiles. Watchdog mode. |
 | **v2.1.0** | Silent mode, progress counter, ARP L2 discovery, randomized scan order, HTTPS probe, extended ports (80/443/3000/8080/8443), mDNS pre-scan, deep fingerprinting, WiFi client mode, multi-subnet sweep, cross-run history/diff. |
 | **v1.0.0** | Initial release — ARP discovery, port probe, basic hardware feedback. |
