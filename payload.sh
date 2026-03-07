@@ -5,7 +5,7 @@
 # =============================================================================
 #
 # VERSION: 2.1.0
-# AUTHOR:  doublegate (doublegate)
+# AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
 # FEATURES:

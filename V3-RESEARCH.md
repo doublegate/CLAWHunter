@@ -200,12 +200,12 @@ After each scan, write a machine-readable JSON summary:
 {
   "scan_id": "20260307_143512",
   "payload_version": "3.0.0",
-  "subnet": "192.168.4.0/24",
+  "subnet": "10.0.0.0/24",
   "hosts_scanned": 47,
   "elapsed_seconds": 62,
   "instances": [
     {
-      "ip": "192.168.4.100",
+      "ip": "10.0.0.100",
       "port": 18790,
       "scheme": "http",
       "confirmed": true,
@@ -284,7 +284,7 @@ Serialize scan state to `/tmp/clawhunter_state.json` every N hosts.
 On startup, detect incomplete previous scan and offer to resume:
 ```
 Resume previous scan?
-192.168.4.0/24 — 43% complete
+10.0.0.0/24 — 43% complete
 (scan_20260307_143512)
 ```
 
