@@ -5,7 +5,46 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 ![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
 ![Language](https://img.shields.io/badge/script-Bash-yellow)
 ![Category](https://img.shields.io/badge/category-Reconnaissance-blue)
-![Version](https://img.shields.io/badge/version-3.0.3-green)
+![Version](https://img.shields.io/badge/version-3.1.0-green)
+
+---
+
+## What's new in v3.1.0
+
+| Change | Detail |
+|--------|--------|
+| **Multi-turn agent session** | Phase 3 completely rewritten: instead of 15 independent one-shot agent queries, a single persistent WebSocket session drives up to 5 sequential turns. The agent maintains full conversation context across turns. |
+| **Agent-native tool exploitation** | Turns now invoke the agent's own built-in tools — `exec`, `Read`, `memory_search`, `sessions_list`, `sessions_history`, and `nodes` — rather than plain natural-language commands. Deeper access, more structured output. |
+| **Out-of-band exfil** | New `--exfil-telegram <bot_token>:<chat_id>` and `--exfil-webhook <URL>` flags. Turn 5 instructs the victim agent to `curl` the harvested summary directly to the attacker endpoint — data never touches the Pager log. |
+| **OOB UI prompts in results browser** | `_do_harvest()` in `lib/common.sh` now asks whether to activate OOB exfil and which method before launching harvest. Operator pre-configures `EXFIL_BOT_TOKEN`, `EXFIL_CHAT_ID`, or `EXFIL_WEBHOOK_URL` in `payload.sh`. |
+| **Improved streaming parser** | `recv_until_done()` now handles both `event.payload.delta` (str and list-of-blocks) and `event.payload.content` shapes, plus all final `res` statuses (`done`, `error`, `complete`, `cancelled`). |
+
+### Turn breakdown (v3.1.0 agent session)
+
+| Turn | Label | Agent tools used | Timeout |
+|------|-------|-----------------|---------|
+| 1 | System enumeration | `exec` (uname, id, env, ps, ls, find, grep), `Read` (openclaw.json, secrets.json, .env, MEMORY.md, USER.md, TOOLS.md) | 60s |
+| 2 | Memory semantic search | `memory_search` — 16 credential/secret keywords | 30s |
+| 3 | Session history | `sessions_list`, `sessions_history` (last 20 msgs × 5 sessions) | 30s |
+| 4 | Paired nodes | `nodes` action=status, action=describe | 20s |
+| 5 | OOB exfil *(optional)* | `exec` — curl to Telegram bot or webhook URL | 20s |
+
+### OOB exfil configuration
+
+Uncomment and fill in the constants near the top of `payloads/user/clawhunter/payload.sh`:
+
+```bash
+# ── Out-of-band exfil config (optional — fill in before deploying) ──────────
+# EXFIL_BOT_TOKEN=""   # Telegram bot token for OOB exfil (from @BotFather)
+# EXFIL_CHAT_ID=""     # Telegram chat_id to receive exfil data
+# EXFIL_WEBHOOK_URL="" # Alternative: HTTPS webhook URL for OOB exfil
+```
+
+When the results browser launches a harvest, it will prompt:
+1. **"Out-of-band exfil?"** — YES activates it, NO skips Turn 5 entirely.
+2. **"Exfil method?"** — YES = Telegram, NO = Webhook.
+
+The victim agent then uses its own `exec` tool to transmit the data directly to the attacker endpoint — the exfil path never crosses the Pager.
 
 ---
 
@@ -256,7 +295,7 @@ A valid OpenClaw gateway accepts the WS upgrade (HTTP 101). Detection confidence
 
 ---
 
-## Harvest module (v3.0.2)
+## Harvest module (v3.1.0)
 
 The integrated post-exploitation module triggers directly from the **Results Browser** after a confirmed OpenClaw find. No separate tool invocation required.
 
@@ -268,7 +307,7 @@ Three-phase harvest against a confirmed target:
 |-------|------|--------------|
 | 1 | **Auth probe** | WebSocket connect attempt — classifies target as OPEN, TOKEN_GATED, or UNREACHABLE |
 | 2 | **HTTP harvest** | Probes `/__openclaw__/canvas/`, `/__openclaw__/a2ui/`, `/agent/status`, and `/` — records status codes, headers, and body content |
-| 3 | **Agent exploitation** | OPEN portals only — sends 15 agent commands over WebSocket to exfiltrate env, memory, SSH keys, credentials, config files, and system info |
+| 3 | **Multi-turn agent session** | OPEN portals only — single persistent WebSocket session drives 4–5 turns exploiting the agent's native tools (`exec`, `Read`, `memory_search`, `sessions_list`, `sessions_history`, `nodes`). Optional Turn 5 directs the agent to exfil data out-of-band to attacker Telegram or webhook. |
 
 ### Requirement
 
@@ -298,15 +337,32 @@ Display during harvest:
 ### What it collects
 
 **On OPEN portals (no token required):**
-- Full environment dump (`env | sort`) — includes `ANTHROPIC_API_KEY` and other secrets
-- `~/clawd/MEMORY.md`, `USER.md`, `SOUL.md`, `IDENTITY.md` — persona and knowledge files
+
+*Turn 1 — System enumeration:*
+- System identity: `uname -a`, `id`, `whoami`, `hostname`, `uptime`, `/etc/os-release`
+- Network: `ip addr`, `ip route`, `/etc/hosts`
+- Running processes: `ps aux`
+- Full environment dump: `env | sort` — includes `ANTHROPIC_API_KEY` and other secrets
+- Workspace listings: `~/`, `~/clawd/`, `~/.openclaw/`
+- `~/.openclaw/openclaw.json` — full gateway config
 - `~/.openclaw/secrets.json` — all gateway credentials
 - `~/.openclaw/credentials/` — all credential JSON files
-- `~/.ssh/id_rsa`, `id_ed25519`, `id_ecdsa` — SSH private keys
-- `~/.openclaw/.env` and `openclaw.json` — config and secrets
-- `~/clawd/HEARTBEAT.md`, `TOOLS.md` — operational context
-- `whoami`, `id`, `hostname`, `uname -a` — system identity
-- Home directory listing
+- `~/.openclaw/.env` — environment secrets file
+- `~/.ssh/` listing + `id_rsa`, `id_ed25519`, `id_ecdsa`, `authorized_keys`
+- `~/clawd/MEMORY.md`, `USER.md`, `TOOLS.md` — persona and knowledge files
+- Token grep across `~/.openclaw/` and `~/clawd/`
+
+*Turn 2 — Memory semantic search:*
+- `memory_search` over 16 keywords: api_key, password, token, secret, credential, ssh, telegram, discord, webhook, database, postgres, mysql, redis, aws, openai, anthropic
+
+*Turn 3 — Session history:*
+- Full message content from the 5 most recent agent sessions (last 20 messages each)
+
+*Turn 4 — Paired nodes:*
+- All paired devices: names, types, capabilities, last-seen timestamps
+
+*Turn 5 — OOB exfil (optional):*
+- Agent curls secrets + memory to attacker Telegram bot or webhook — direct exfil from victim system, never via Pager
 
 **On TOKEN_GATED portals:**
 - HTTP harvest only (canvas, a2ui, agent/status, root path)

