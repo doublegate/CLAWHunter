@@ -102,13 +102,24 @@ log_section()   { [ -n "$LOG_FILE" ] && printf "\n── %s ──\n" "$1" >> "$
 
 ws_probe() {
     local ip="$1" port="$2"
-    local resp
-    resp=$(timeout 3 bash -c "
-        exec 3<>/dev/tcp/${ip}/${port} 2>/dev/null || exit 1
-        printf 'GET / HTTP/1.1\r\nHost: ${ip}:${port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n' >&3
-        timeout 2 cat <&3 2>/dev/null
-        exec 3>&-
-    " 2>/dev/null)
+    local WS_REQ="GET / HTTP/1.1\r\nHost: ${ip}:${port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+    local resp=""
+
+    # Try /dev/tcp first (no subprocess overhead) — may be disabled in some OpenWRT bash builds
+    if [ -e /dev/tcp ] || (exec 3<>/dev/tcp/127.0.0.1/1 2>/dev/null); then
+        resp=$(timeout 3 bash -c "
+            exec 3<>/dev/tcp/${ip}/${port} 2>/dev/null || exit 1
+            printf '${WS_REQ}' >&3
+            timeout 2 cat <&3 2>/dev/null
+            exec 3>&-
+        " 2>/dev/null)
+    fi
+
+    # Fallback: nc (always available on the Pager — used by v2.x already)
+    if [ -z "$resp" ] && command -v nc >/dev/null 2>&1; then
+        resp=$(printf "${WS_REQ}" | nc -w 3 "$ip" "$port" 2>/dev/null)
+    fi
+
     echo "$resp" | grep -qi '101 switching\|sec-websocket-accept'
 }
 

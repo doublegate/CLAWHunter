@@ -100,13 +100,13 @@ sleep 1
 PASS=""
 ENC_LC=$(echo "${ENC:-open}" | tr '[:upper:]' '[:lower:]')
 if ! echo "$ENC_LC" | grep -qE '^(open|none|)$'; then
-    PASS=$(TEXT_PICKER "Password for: $SSID" "")
-    case $? in
-        $DUCKYSCRIPT_CANCELLED | $DUCKYSCRIPT_REJECTED | $DUCKYSCRIPT_ERROR)
-            LOG red "Cancelled"
-            exit $DUCKYSCRIPT_CANCELLED
-            ;;
-    esac
+    # DuckyScript has no free-text picker — password must be pre-stored or
+    # the AP pre-joined. Notify user and attempt connection with empty password
+    # (works if credentials are already saved on the Pager).
+    LOG red "Encrypted AP: $SSID"
+    LOG blue "Pre-join via Settings if needed"
+    sleep 2
+    PASS=""
 fi
 
 # ── Connect to AP ─────────────────────────────────────────────────────────────

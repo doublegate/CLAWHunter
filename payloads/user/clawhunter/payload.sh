@@ -323,7 +323,7 @@ _run_port_scan() {
 
     # ── Randomize ──────────────────────────────────────────────────
     if [ $RANDOMIZE -eq 1 ] && [ -n "$raw_hosts" ]; then
-        raw_hosts=$(echo "$raw_hosts" | shuf)
+        raw_hosts=$(echo "$raw_hosts" | awk 'BEGIN{srand()} {print rand() "\t" $0}' | sort -n | cut -f2-)
         log_entry "Scan order: randomized"
     fi
 
@@ -599,7 +599,7 @@ resp=$(CONFIRMATION_DIALOG "Randomize MAC?" "Change scanner MAC before scan — 
 case "$resp" in
     $DUCKYSCRIPT_USER_CONFIRMED)
         # Determine interface to randomize
-        local_iface=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'dev \K\S+' | head -1)
+        local_iface=$(ip route get 1.1.1.1 2>/dev/null | awk '/dev/{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}' | head -1)
         [ -z "$local_iface" ] && local_iface="wlan0"
         mac_randomize "$local_iface"
         ;;
@@ -644,22 +644,31 @@ case "$resp" in
         SSID="${_RECON_SELECTED_AP_SSID:-}"
         ENC="${_RECON_SELECTED_AP_ENCRYPTION_TYPE:-}"
 
+        # Note: WiFi client mode without Recon context requires launching from
+        # Recon UI with an AP selected (_RECON_SELECTED_AP_SSID populated).
+        # Manual SSID/password entry is not supported — DuckyScript has no
+        # free-text picker. Connect to the target AP via the Pager's WiFi
+        # settings first, then run this payload.
         if [ -z "$SSID" ]; then
-            SSID=$(TEXT_PICKER "AP SSID" "")
-            case $? in
-                $DUCKYSCRIPT_CANCELLED | $DUCKYSCRIPT_REJECTED | $DUCKYSCRIPT_ERROR)
-                    LOG red "Cancelled"; exit $DUCKYSCRIPT_CANCELLED ;;
-            esac
+            LOG red "No Recon AP selected"
+            LOG blue "Launch from Recon UI"
+            LOG blue "or pre-connect via Settings"
+            sleep 3
+            # Fall through to non-WiFi-client path
+            resp=""
         fi
 
         PASS=""
         ENC_LC=$(echo "${ENC:-open}" | tr '[:upper:]' '[:lower:]')
-        if ! echo "$ENC_LC" | grep -qE '^(open|none|)$'; then
-            PASS=$(TEXT_PICKER "Password for: $SSID" "")
-            case $? in
+        if [ -n "$SSID" ] && ! echo "$ENC_LC" | grep -qE '^(open|none|)$'; then
+            # Encrypted AP — ask if password is needed (can't type it in DuckyScript)
+            resp2=$(CONFIRMATION_DIALOG "AP is encrypted" "Pre-connect via Pager Settings if needed — continue anyway?")
+            case "$resp2" in
                 $DUCKYSCRIPT_CANCELLED | $DUCKYSCRIPT_REJECTED | $DUCKYSCRIPT_ERROR)
                     LOG red "Cancelled"; exit $DUCKYSCRIPT_CANCELLED ;;
             esac
+            # WIFI_CONNECT with empty password attempts open/saved-credential join
+            PASS=""
         fi
 
         LOG blue "Connecting to $SSID..."
@@ -694,7 +703,7 @@ case "$resp" in
         fi
         ;;
     *)
-        LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+        LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}' | head -1)
         [ -z "$LOCAL_IP" ] && \
             LOCAL_IP=$(ip addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' \
                        | awk '{print $2}' | cut -d/ -f1 | head -1)
