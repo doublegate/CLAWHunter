@@ -4,6 +4,21 @@ All notable changes to CLAWHunter are documented here.
 
 ---
 
+## [v3.2.0] — 2026-03-07
+
+### Added
+- **IPv6 link-local harvest** — `arp_cache_harvest()` now checks `ip -6 neigh show` for `fe80::/10` neighbors. Results are logged as candidates with a `[IPv6]` prefix; full port scanning remains IPv4-only (scope ID complexity).
+- **Scan resume / checkpoint** — at scan start, if `/tmp/clawhunter_checkpoint_<subnet>` exists, already-scanned hosts are skipped and a resume count is displayed. Works in both sequential (NORMAL/QUIET) and parallel (FAST/AGGRESSIVE) scan paths. Checkpoint is preserved on abort, removed on clean completion.
+- **Harvest global timeout** — `harvest.py` enforces a 180-second ceiling across all 5 agent turns. Partial results are returned rather than hanging indefinitely.
+- **Watchdog state persistence** — `watchdog_state.json` written to `/root/loot/clawhunter/` captures the last known instance list. On restart, watchdog loads this as its baseline so previously-found instances don't re-trigger as "new".
+
+### Fixed
+- **IPv6/IPv4 sort collision** — `arp_cache_harvest()` previously piped IPv6 addresses (`fe80::...`) through `sort -t. -k4 -n` (IPv4 dot-field sort). IPv6 addresses are now sorted separately with `sort -u` to avoid malformed output.
+- **Parallel checkpoint gap** — `_run_parallel_probe()` (FAST/AGGRESSIVE profiles) neither skipped checkpoint-recorded hosts nor wrote new ones. Both behaviours now match the sequential path.
+- Version numbers unified to 3.2.0 across `lib/common.sh`, all three `payload.sh` files, and `harvest.py`.
+
+---
+
 ## [v3.1.0] — 2026-03-07
 
 ### Added

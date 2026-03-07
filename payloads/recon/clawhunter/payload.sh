@@ -7,7 +7,7 @@
 # For the Hak5 WiFi Pineapple Pager — Runs from Recon UI against a selected AP
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.1.0
+# PAYLOAD_VERSION: 3.2.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -31,7 +31,7 @@
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.json
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.1.0"
+readonly PAYLOAD_VERSION="3.2.0"
 readonly OPENCLAW_DEFAULT_PORT=18790
 readonly OPENCLAW_RANGE_LOW=18780
 readonly OPENCLAW_RANGE_HIGH=18800

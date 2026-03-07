@@ -7,7 +7,7 @@
 # For the Hak5 WiFi Pineapple Pager — Fires on client connect to Pager AP
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.1.0
+# PAYLOAD_VERSION: 3.2.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -30,7 +30,7 @@
 #   /root/loot/clawhunter/alert_YYYYMMDD_HHMMSS.log
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.1.0"
+readonly PAYLOAD_VERSION="3.2.0"
 readonly OPENCLAW_DEFAULT_PORT=18790
 readonly LOOT_BASE="/root/loot/clawhunter"
 

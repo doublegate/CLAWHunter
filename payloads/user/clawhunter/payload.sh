@@ -415,8 +415,20 @@ _run_port_scan() {
     local probe_idx=0
 
     if [ "${PARALLEL_COUNT:-1}" -gt 1 ]; then
-        # FAST/AGGRESSIVE: parallel background probes
-        _run_parallel_probe "${LIVE_HOSTS[@]}"
+        # FAST/AGGRESSIVE: filter checkpoint-skipped hosts before launching parallel probes
+        # _scanned_set and CHECKPOINT_FILE are in scope via bash dynamic scoping
+        if [ ${#_scanned_set[@]} -gt 0 ]; then
+            local _filtered_parallel=()
+            for _ph in "${LIVE_HOSTS[@]}"; do
+                if [ -n "${_scanned_set[$_ph]+_}" ]; then
+                    continue  # already scanned in a previous run
+                fi
+                _filtered_parallel+=("$_ph")
+            done
+            _run_parallel_probe "${_filtered_parallel[@]}"
+        else
+            _run_parallel_probe "${LIVE_HOSTS[@]}"
+        fi
     else
         # NORMAL/QUIET: sequential probes
         for IP in "${LIVE_HOSTS[@]}"; do
@@ -523,6 +535,10 @@ _run_parallel_probe() {
             wait -n 2>/dev/null || sleep 0.1
             active=$(jobs -p | wc -l)
         done
+
+        # Checkpoint: record host as scanned (parallel path)
+        # CHECKPOINT_FILE is in scope via bash dynamic scoping from run_scan
+        [ -n "${CHECKPOINT_FILE:-}" ] && echo "$IP" >> "$CHECKPOINT_FILE"
 
         probe_idx=$((probe_idx + 1))
         HOSTS_SCANNED=$((HOSTS_SCANNED + 1))

@@ -9,7 +9,7 @@
 #   payloads/recon/clawhunter/payload.sh
 #   payloads/alert/clawhunter-watchdog/payload.sh
 #
-# VERSION: 3.1.0  (IPv6 neighbor harvest)
+# VERSION: 3.2.0  (IPv6 harvest fix, parallel checkpoint)
 # REPO:    https://github.com/doublegate/CLAWHunter
 # =============================================================================
 
@@ -17,7 +17,7 @@
 . /lib/hak5/commands.sh 2>/dev/null || true
 
 # ── Constants (set in payload if not already defined) ─────────────────────────
-: "${PAYLOAD_VERSION:=3.0.0}"
+: "${PAYLOAD_VERSION:=3.2.0}"
 : "${LOOT_BASE:=/root/loot/clawhunter}"
 : "${SILENT:=0}"
 : "${FOUND_COUNT:=0}"
@@ -454,6 +454,7 @@ mdns_prescan() {
 
 arp_cache_harvest() {
     local subnet="$1"
+    # IPv4 neighbors — sorted by last octet numerically
     {
         # /proc/net/arp
         awk -v sub="$subnet" 'NR>1 && $1 ~ "^"sub"\." && $4 != "00:00:00:00:00:00" { print $1 }' \
@@ -462,14 +463,15 @@ arp_cache_harvest() {
         # ip neigh show (also catches IPv4 neigh not in arp table)
         ip neigh show 2>/dev/null \
             | awk -v sub="$subnet" '$1 ~ "^"sub"\." && $NF !~ "FAILED" { print $1 }'
-
-        # IPv6 link-local neighbors (fe80::/10)
-        if ip -6 neigh show 2>/dev/null | grep -q "fe80"; then
-            ip -6 neigh show 2>/dev/null | awk '/fe80/ && /REACHABLE|STALE|DELAY/ {
-                split($1, a, "%"); print a[1]
-            }' | sort -u
-        fi
     } | sort -u -t. -k4 -n
+
+    # IPv6 link-local neighbors (fe80::/10) — separate from IPv4 sort
+    # These are logged as candidates only; full port scan is IPv4-only.
+    if ip -6 neigh show 2>/dev/null | grep -q "fe80"; then
+        ip -6 neigh show 2>/dev/null | awk '/fe80/ && /REACHABLE|STALE|DELAY/ {
+            split($1, a, "%"); print a[1]
+        }' | sort -u
+    fi
 }
 
 # ── Feature 3: ARP host discovery ─────────────────────────────────────────────

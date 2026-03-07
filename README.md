@@ -7,7 +7,7 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 ![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
 ![Language](https://img.shields.io/badge/script-Bash%20%2B%20Python3-yellow)
 ![Category](https://img.shields.io/badge/category-Reconnaissance%20%2F%20Exploitation-blue)
-![Version](https://img.shields.io/badge/version-3.1.0-green)
+![Version](https://img.shields.io/badge/version-3.2.0-green)
 
 ---
 
@@ -596,6 +596,7 @@ For full version details with dates and breaking changes: [`CHANGELOG.md`](CHANG
 
 | Version | Changes |
 |---------|---------|
+| **v3.2.0** | IPv6 link-local neighbor harvest (`fe80::/10`) via `ip -6 neigh` — logged as candidates. Scan resume/checkpoint for sequential and parallel paths. Global 3-minute harvest session ceiling. Watchdog state persistence across reboots (`watchdog_state.json`). Fixed IPv6/IPv4 sort collision in `arp_cache_harvest()`. |
 | **v3.1.0** | Multi-turn agent session (5 turns, single persistent WS connection). Agent-native tool exploitation: `memory_search`, `sessions_list`, `sessions_history`, `nodes`. Out-of-band exfil via Telegram bot or webhook (Turn 5, optional). Improved streaming parser handles all `event.payload` shapes and all terminal `res` statuses. |
 | **v3.0.3** | Per-profile timing dither (`$RANDOM`-based, busybox-compatible) for two-axis IDS evasion. Dead `hashlib` import removed from `harvest.py`. |
 | **v3.0.2** | Integrated harvest module (`harvest.py`): stdlib-only Python3, three-phase (auth probe → HTTP harvest → multi-turn agent session). Triggered from results browser with RIGHT key. |
