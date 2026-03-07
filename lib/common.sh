@@ -9,7 +9,7 @@
 #   payloads/recon/clawhunter/payload.sh
 #   payloads/alert/clawhunter-watchdog/payload.sh
 #
-# VERSION: 3.0.0
+# VERSION: 3.1.0  (IPv6 neighbor harvest)
 # REPO:    https://github.com/doublegate/CLAWHunter
 # =============================================================================
 
@@ -462,6 +462,13 @@ arp_cache_harvest() {
         # ip neigh show (also catches IPv4 neigh not in arp table)
         ip neigh show 2>/dev/null \
             | awk -v sub="$subnet" '$1 ~ "^"sub"\." && $NF !~ "FAILED" { print $1 }'
+
+        # IPv6 link-local neighbors (fe80::/10)
+        if ip -6 neigh show 2>/dev/null | grep -q "fe80"; then
+            ip -6 neigh show 2>/dev/null | awk '/fe80/ && /REACHABLE|STALE|DELAY/ {
+                split($1, a, "%"); print a[1]
+            }' | sort -u
+        fi
     } | sort -u -t. -k4 -n
 }
 

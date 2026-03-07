@@ -1,10 +1,13 @@
 #!/bin/bash
+# Title: CLAWHunter
+# Description: Discover and exploit OpenClaw AI gateway instances on local networks. Full interactive experience with mDNS monitor, ARP discovery, WebSocket fingerprinting, scan speed profiles, watchdog mode, and integrated post-exploitation harvest engine.
+# Author: doublegate
 # =============================================================================
 # CLAWHunter — OpenClaw Instance Discovery Payload (User / Interactive)
 # For the Hak5 WiFi Pineapple Pager (480×222 px, 16-bit color, 221 PPI)
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.1.0
+# PAYLOAD_VERSION: 3.2.0  (IPv6 candidates, scan resume/checkpoint, watchdog state)
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -41,7 +44,7 @@
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.json
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.1.0"
+readonly PAYLOAD_VERSION="3.2.0"
 readonly OPENCLAW_DEFAULT_PORT=18790
 readonly OPENCLAW_RANGE_LOW=18780
 readonly OPENCLAW_RANGE_HIGH=18800
@@ -335,6 +338,20 @@ run_scan() {
 
 # ── Active port scan (inner loop) — called from run_scan() ───────────────────
 _run_port_scan() {
+    # ── Scan resume checkpoint setup ──────────────────────────────
+    local CHECKPOINT_FILE="/tmp/clawhunter_checkpoint_${SUBNET//./_}"
+    declare -A _scanned_set=()
+    if [ -f "$CHECKPOINT_FILE" ]; then
+        local _skip_count=0
+        while IFS= read -r _h; do
+            [ -n "$_h" ] && { _scanned_set["$_h"]=1; _skip_count=$((_skip_count + 1)); }
+        done < "$CHECKPOINT_FILE"
+        if [ "$_skip_count" -gt 0 ]; then
+            LOG blue "Resume: skipping $_skip_count already-scanned hosts"
+            log_entry "Checkpoint: resuming scan — skipping $_skip_count hosts from ${CHECKPOINT_FILE}"
+        fi
+    fi
+
     # ── C2: ARP cache harvest before full discovery ────────────────
     LOG blue "Checking ARP cache..."
     local cache_hosts
@@ -370,7 +387,14 @@ _run_port_scan() {
 
     local -a LIVE_HOSTS=()
     while IFS= read -r h; do
-        [ -n "$h" ] && LIVE_HOSTS+=("$h")
+        [ -n "$h" ] || continue
+        # IPv6 link-local: log as candidate, do not port-scan
+        if echo "$h" | grep -q "^fe80"; then
+            LOG blue "[IPv6] candidate: $h (manual probe required)"
+            log_entry "[IPv6] ${h} — IPv6 candidate (manual probe required)"
+            continue
+        fi
+        LIVE_HOSTS+=("$h")
     done <<< "$raw_hosts"
 
     local TOTAL_LIVE=${#LIVE_HOSTS[@]}
@@ -399,6 +423,13 @@ _run_port_scan() {
             local btn
             btn=$(timeout 0.05 sh -c 'WAIT_FOR_INPUT 2>/dev/null' 2>/dev/null || true)
             if [ "$btn" = "B" ]; then ABORT=1; break; fi
+
+            # Resume: skip already-scanned hosts
+            if [ -n "${_scanned_set[$IP]+_}" ]; then
+                continue
+            fi
+            # Checkpoint: record this host before probing
+            echo "$IP" >> "$CHECKPOINT_FILE"
 
             probe_idx=$((probe_idx + 1))
             HOSTS_SCANNED=$((HOSTS_SCANNED + 1))
@@ -460,6 +491,11 @@ _run_port_scan() {
         ringtone_abort
         LOG red "Scan aborted"
         log_entry "SCAN ABORTED BY USER"
+        # Leave checkpoint in place so next run can resume
+    else
+        # Clean completion — remove checkpoint
+        rm -f "$CHECKPOINT_FILE"
+        log_entry "Checkpoint removed: scan complete"
     fi
 }
 
@@ -543,6 +579,42 @@ _run_parallel_probe() {
     rm -rf "$sem_dir"
 }
 
+# ── F5: Watchdog state helpers ───────────────────────────────────────────────
+
+_watchdog_state_file() { echo "${LOOT_BASE}/watchdog_state.json"; }
+
+_watchdog_write_state() {
+    local run_counter="$1"
+    local state_file
+    state_file=$(_watchdog_state_file)
+    {
+        printf '{\n'
+        printf '  "watchdog_run": %d,\n' "$run_counter"
+        printf '  "payload_version": "%s",\n' "$PAYLOAD_VERSION"
+        printf '  "timestamp": "%s",\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        printf '  "instances": [\n'
+        local count=${#FOUND_HOSTS[@]}
+        local i=0
+        for h in "${FOUND_HOSTS[@]:-}"; do
+            local comma=""
+            [ $((i + 1)) -lt "$count" ] && comma=","
+            printf '    "%s"%s\n' "$h" "$comma"
+            i=$((i + 1))
+        done
+        printf '  ]\n'
+        printf '}\n'
+    } > "$state_file"
+}
+
+_watchdog_read_state() {
+    # Reads instance strings from a previous watchdog_state.json.
+    # Outputs one "ip:port" string per line.
+    local state_file
+    state_file=$(_watchdog_state_file)
+    [ -f "$state_file" ] || return
+    grep -oE '"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[^"]*"' "$state_file" | tr -d '"'
+}
+
 # ── F5: Watchdog mode ─────────────────────────────────────────────────────────
 # Rescans every N minutes. Alerts only on changes (new/gone instances).
 # B-button during the sleep countdown exits watchdog.
@@ -553,9 +625,24 @@ run_watchdog() {
     LOG blue "B to exit watchdog"
     log_entry "Watchdog mode started: interval=${interval_min}min"
 
-    # Save initial baseline
+    # Load baseline from persisted state if available (survives reboots)
     declare -A baseline=()
-    for h in "${FOUND_HOSTS[@]:-}"; do baseline["$h"]=1; done
+    local _prev_state
+    _prev_state=$(_watchdog_read_state)
+    if [ -n "$_prev_state" ]; then
+        LOG blue "Watchdog: restoring previous state..."
+        log_entry "Watchdog: loaded previous state from watchdog_state.json"
+        while IFS= read -r _ph; do
+            [ -n "$_ph" ] && baseline["$_ph"]=1
+        done <<< "$_prev_state"
+    else
+        for h in "${FOUND_HOSTS[@]:-}"; do baseline["$h"]=1; done
+    fi
+
+    local watchdog_run=0
+
+    # Write initial state
+    _watchdog_write_state "$watchdog_run"
 
     while true; do
         led_watchdog
@@ -569,6 +656,7 @@ run_watchdog() {
             if [ "$btn" = "B" ]; then
                 LOG blue "Watchdog: exit"
                 log_entry "Watchdog exited by user"
+                rm -f "$(_watchdog_state_file)"
                 return
             fi
             elapsed_wait=$((elapsed_wait + 1))
@@ -580,6 +668,10 @@ run_watchdog() {
         LOG blue "Watchdog: rescanning..."
         log_entry "Watchdog: starting rescan"
         run_scan
+        watchdog_run=$((watchdog_run + 1))
+
+        # Persist state after each scan
+        _watchdog_write_state "$watchdog_run"
 
         # Compare with baseline
         local new_count=0 gone_count=0
@@ -597,9 +689,10 @@ run_watchdog() {
             ringtone_watchdog_alert; vibrate_strong
             ALERT "Watchdog: CHANGE!\nNEW: $new_count  GONE: $gone_count\nPress any key"
             log_entry "Watchdog: change detected — NEW=$new_count GONE=$gone_count"
-            # Update baseline
+            # Update baseline and persist
             declare -A baseline=()
             for h in "${!current[@]}"; do baseline["$h"]=1; done
+            _watchdog_write_state "$watchdog_run"
         else
             LOG blue "Watchdog: no changes"
             log_entry "Watchdog: no changes detected"

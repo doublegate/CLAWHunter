@@ -1,4 +1,7 @@
 #!/bin/bash
+# Title: CLAWHunter (Alert / Watchdog)
+# Description: Zero-interaction OpenClaw probe. Auto-fires when any client connects to the Pager AP — silently checks the connecting client for an OpenClaw gateway signature in under 5 seconds.
+# Author: doublegate
 # =============================================================================
 # CLAWHunter — Alert Payload Variant (Watchdog)
 # For the Hak5 WiFi Pineapple Pager — Fires on client connect to Pager AP

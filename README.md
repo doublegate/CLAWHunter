@@ -31,7 +31,8 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 12. [Port reference](#port-reference)
 13. [External tools & fallbacks](#external-tools--fallbacks)
 14. [Log & report output](#log--report-output)
-15. [Version history](#version-history)
+15. [Troubleshooting](#troubleshooting)
+16. [Version history](#version-history)
 
 ---
 
@@ -40,17 +41,24 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 ```
 CLAWHunter/
 ├── docs/
-│   └── V3-RESEARCH.md                ← Protocol research, feature specs, stretch goals
+│   ├── V3-RESEARCH.md                ← Protocol research, feature specs, stretch goals
+│   ├── architecture.dot              ← Graphviz source for architecture diagram
+│   └── architecture.svg              ← Architecture diagram (vector)
+├── images/
+│   ├── architecture.png              ← Architecture diagram (rendered)
+│   └── pager-transparent.png         ← Pager hero image
 ├── lib/
 │   └── common.sh                     ← Shared library (LED, audio, fingerprinting, harvest trigger)
-└── payloads/
-    ├── user/clawhunter/
-    │   ├── payload.sh                ← Interactive payload (all features)
-    │   └── harvest.py                ← Post-exploitation harvest engine (Python3, stdlib-only)
-    ├── recon/clawhunter/
-    │   └── payload.sh                ← Recon variant (RF-first, auto-connect)
-    └── alert/clawhunter-watchdog/
-        └── payload.sh                ← Alert variant (auto-fires, <5s, silent)
+├── payloads/
+│   ├── user/clawhunter/
+│   │   ├── payload.sh                ← Interactive payload (all features)
+│   │   └── harvest.py                ← Post-exploitation harvest engine (Python3, stdlib-only)
+│   ├── recon/clawhunter/
+│   │   └── payload.sh                ← Recon variant (RF-first, auto-connect)
+│   └── alert/clawhunter-watchdog/
+│       └── payload.sh                ← Alert variant (auto-fires, <5s, silent)
+├── CHANGELOG.md                      ← Full version history with dates
+└── CONTRIBUTING.md                   ← Contribution guidelines and compatibility rules
 ```
 
 ---
@@ -539,6 +547,48 @@ SUMMARY
   ]
 }
 ```
+
+---
+
+## Troubleshooting
+
+### `harvest.py` not found / harvest doesn't launch
+Verify `harvest.py` is deployed at exactly `/root/payloads/user/clawhunter/harvest.py`. The path is hardcoded in `lib/common.sh`. The user payload's directory structure on the Pager must match the layout in the [Deploy](#prerequisites--deploy) section.
+
+### `python3: not found` error at harvest launch
+Install python3 to the MMC partition:
+```bash
+opkg update && opkg install -d mmc python3
+```
+
+### `opkg update` fails — no internet
+The Pager needs internet access to reach the OpenWRT package repository. Connect the Pager's management interface to an internet-connected network before running `opkg`.
+
+### `lib/common.sh: not found` on Pager
+The shared library must be at `/root/payloads/lib/common.sh`. Each payload sources it with a relative `../../lib/common.sh` path — if the directory structure is wrong the payload will fail immediately on launch. Re-deploy using the rsync command in the [Deploy](#prerequisites--deploy) section.
+
+### mDNS monitor never finds anything
+`avahi-browse` is not installed by default. Either install it (`opkg install -d mmc avahi-utils`) or press **B** during the mDNS countdown to skip it and proceed directly to the port sweep.
+
+### MAC randomization fails silently
+The Pager may not have `macchanger` installed. `lib/common.sh` falls back to `ip link set dev <iface> address <mac>` automatically. If both fail, the scan proceeds with the real MAC and a warning is logged.
+
+### WiFi client mode — cannot connect to encrypted AP
+DuckyScript has no free-text input, so passwords cannot be entered at runtime. Pre-save the AP credentials in the Pager's WiFi Settings before launching the payload. If credentials are not saved, the connection attempt will fail and the payload will log a notice and exit.
+
+### Harvest hangs / no output
+The victim gateway may be slow or the session may have stalled. The harvest engine enforces per-turn timeouts (20–60s) and a 3-minute global session ceiling. If it's still running past 3 minutes, check `/root/loot/clawhunter/harvest_*.log` for partial output.
+
+### Scan finds nothing on a subnet where OpenClaw is known to exist
+OpenClaw binds to `127.0.0.1` (loopback) by default. CLAWHunter can only find instances where the gateway has been configured to bind to a LAN interface (`gateway.bind` in `openclaw.json`) or is behind a reverse proxy. Confirm the target's bind address before scanning.
+
+---
+
+## Further reading
+
+Protocol research, feature specifications, and stretch goals: [`docs/V3-RESEARCH.md`](docs/V3-RESEARCH.md)
+
+For full version details with dates and breaking changes: [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
 

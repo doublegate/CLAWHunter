@@ -29,7 +29,7 @@
 #   2 = unreachable
 #   3 = error
 #
-# VERSION: 3.1.0
+# VERSION: 3.2.0  (global session timeout)
 # REPO:    https://github.com/doublegate/CLAWHunter
 # =============================================================================
 
@@ -285,6 +285,9 @@ def http_get(ip, port, path, timeout=5):
 
 # ── Phase 1: Auth probe ───────────────────────────────────────────────────────
 
+# Global session timeout for _do_agent_session (Phase 3) — covers all turns
+SESSION_TIMEOUT = 180  # seconds (3 minutes)
+
 AUTH_OPEN = "OPEN"
 AUTH_TOKEN_GATED = "TOKEN_GATED"
 AUTH_UNREACHABLE = "UNREACHABLE"
@@ -498,6 +501,9 @@ def phase3_agent_session(ip, port, log_lines, exfil_telegram=None, exfil_webhook
     """
     log_lines.append("\n── AGENT SESSION ──")
 
+    # Global session start time — enforced across all turns
+    session_start = time.time()
+
     # Establish persistent WebSocket connection
     try:
         sock = socket.create_connection((ip, port), timeout=8)
@@ -539,6 +545,14 @@ def phase3_agent_session(ip, port, log_lines, exfil_telegram=None, exfil_webhook
             str: The accumulated agent response text, or empty string on failure.
         """
         nonlocal turn_num, turns_completed
+        # Enforce global session timeout before starting each turn
+        if time.time() - session_start > SESSION_TIMEOUT:
+            log_lines.append(
+                f"\n[{label}]\n"
+                f"[!] Global session timeout ({SESSION_TIMEOUT}s) exceeded — "
+                f"returning collected data"
+            )
+            return ""
         log_lines.append(f"\n[{label}]")
         try:
             payload = json.dumps({

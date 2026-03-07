@@ -1,4 +1,7 @@
 #!/bin/bash
+# Title: CLAWHunter (Recon)
+# Description: RF-first OpenClaw discovery. Launch from the Recon UI after selecting a target AP — automatically reads AP context, connects, scans, and logs found instances.
+# Author: doublegate
 # =============================================================================
 # CLAWHunter — Recon Payload Variant
 # For the Hak5 WiFi Pineapple Pager — Runs from Recon UI against a selected AP
