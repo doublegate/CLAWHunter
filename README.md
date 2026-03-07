@@ -5,7 +5,7 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 ![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
 ![Language](https://img.shields.io/badge/script-Bash-yellow)
 ![Category](https://img.shields.io/badge/category-Reconnaissance-blue)
-![Version](https://img.shields.io/badge/version-3.0.0-green)
+![Version](https://img.shields.io/badge/version-3.0.2-green)
 
 ---
 
@@ -191,6 +191,7 @@ Launch from **Payloads → user → clawhunter** in the Pager UI.
 | B | During scan | Abort scan cleanly |
 | B | mDNS countdown | Abort mDNS monitor early |
 | UP/DOWN | Results browser | Navigate found hosts |
+| RIGHT (or any unhandled key) | Results browser | Launch harvest against current find |
 | B or LEFT | Results browser | Exit browser |
 | UP/DOWN | History browser | Navigate past finds |
 | B or LEFT | History browser | Exit browser |
@@ -231,6 +232,79 @@ A valid OpenClaw gateway accepts the WS upgrade (HTTP 101). Detection confidence
 - Active tool calls count
 - Sub-agent count
 - Gateway uptime timestamp
+
+---
+
+## Harvest module (v3.0.2)
+
+The integrated post-exploitation module triggers directly from the **Results Browser** after a confirmed OpenClaw find. No separate tool invocation required.
+
+### What it does
+
+Three-phase harvest against a confirmed target:
+
+| Phase | Name | What it does |
+|-------|------|--------------|
+| 1 | **Auth probe** | WebSocket connect attempt — classifies target as OPEN, TOKEN_GATED, or UNREACHABLE |
+| 2 | **HTTP harvest** | Probes `/__openclaw__/canvas/`, `/__openclaw__/a2ui/`, `/agent/status`, and `/` — records status codes, headers, and body content |
+| 3 | **Agent exploitation** | OPEN portals only — sends 15 agent commands over WebSocket to exfiltrate env, memory, SSH keys, credentials, config files, and system info |
+
+### Requirement
+
+Python3 must be installed on the Pager:
+
+```bash
+opkg install -d mmc python3
+```
+
+harvest.py is stdlib-only — no pip, no third-party packages required.
+
+### How to trigger
+
+1. Run CLAWHunter until a confirmed OpenClaw instance appears in the Results Browser
+2. Navigate to the target with **UP/DOWN**
+3. Press **RIGHT** (or any key other than UP/DOWN/B/LEFT) to launch harvest
+
+Display during harvest:
+```
+  Find 1/1                        ← green
+    192.168.4.100                 ← green
+    port: 18790                   ← blue
+    http:// | HTTP 401 | ...
+    UP/DOWN=nav  B=done  >=harvest
+```
+
+### What it collects
+
+**On OPEN portals (no token required):**
+- Full environment dump (`env | sort`) — includes `ANTHROPIC_API_KEY` and other secrets
+- `~/clawd/MEMORY.md`, `USER.md`, `SOUL.md`, `IDENTITY.md` — persona and knowledge files
+- `~/.openclaw/secrets.json` — all gateway credentials
+- `~/.openclaw/credentials/` — all credential JSON files
+- `~/.ssh/id_rsa`, `id_ed25519`, `id_ecdsa` — SSH private keys
+- `~/.openclaw/.env` and `openclaw.json` — config and secrets
+- `~/clawd/HEARTBEAT.md`, `TOOLS.md` — operational context
+- `whoami`, `id`, `hostname`, `uname -a` — system identity
+- Home directory listing
+
+**On TOKEN_GATED portals:**
+- HTTP harvest only (canvas, a2ui, agent/status, root path)
+- No agent exploitation without a valid token
+
+### Log location
+
+```
+/root/loot/clawhunter/harvest_<IP>_<YYYYMMDD_HHMMSS>.log
+```
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Harvest complete — agent data collected |
+| 1 | Token-gated — HTTP harvest only, no agent access |
+| 2 | Unreachable — target went offline |
+| 3 | Error — unexpected failure (check log) |
 
 ---
 

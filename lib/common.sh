@@ -674,6 +674,71 @@ run_diff() {
 }
 
 # ── Results browser ───────────────────────────────────────────────────────────
+# Harvest integration (v3.0.2):
+# Pressing RIGHT or any unhandled key (not UP/DOWN/B/LEFT) on a confirmed
+# find triggers harvest.py against that host. Requires python3 on Pager:
+#   opkg install -d mmc python3
+#
+# harvest.py lives at: /root/payloads/user/clawhunter/harvest.py
+# Logs written to:     /root/loot/clawhunter/harvest_<IP>_<TIMESTAMP>.log
+
+_do_harvest() {
+    local host_ip="$1" host_port="$2"
+    local harvest_py="/root/payloads/user/clawhunter/harvest.py"
+    local loot_dir="/root/loot/clawhunter"
+
+    # Check python3 availability
+    if ! command -v python3 >/dev/null 2>&1; then
+        ALERT "python3 required\nopkg install -d mmc python3\nthen re-run"
+        return
+    fi
+
+    # Check harvest.py exists
+    if [ ! -f "$harvest_py" ]; then
+        ALERT "harvest.py not found\nExpected: ${harvest_py}"
+        return
+    fi
+
+    mkdir -p "$loot_dir"
+    local log_path="${loot_dir}/harvest_${host_ip}_$(date +%Y%m%d_%H%M%S).log"
+
+    LOG blue "Harvesting ${host_ip}:${host_port}..."
+    led_scanning
+
+    local SID
+    SID=$(START_SPINNER "Harvesting ${host_ip}...")
+
+    python3 "$harvest_py" \
+        --ip "$host_ip" \
+        --port "$host_port" \
+        --out "$log_path"
+
+    local exit_code=$?
+    STOP_SPINNER "$SID"
+
+    case $exit_code in
+        0)
+            led_found; ringtone_found; vibrate_strong
+            ALERT "Harvest complete!\n${host_ip}:${host_port}\nLog: $(basename "$log_path")"
+            ;;
+        1)
+            LOG red "Token-gated — no access"
+            log_entry "Harvest: TOKEN_GATED on ${host_ip}:${host_port}"
+            led_complete_none
+            sleep 1
+            ;;
+        2)
+            LOG red "Unreachable"
+            log_entry "Harvest: UNREACHABLE on ${host_ip}:${host_port}"
+            sleep 1
+            ;;
+        *)
+            LOG red "Harvest error (${exit_code})"
+            log_entry "Harvest: error exit ${exit_code} on ${host_ip}:${host_port}"
+            sleep 1
+            ;;
+    esac
+}
 
 show_results_browser() {
     [ "${FOUND_COUNT:-0}" -eq 0 ] && return
@@ -690,14 +755,18 @@ show_results_browser() {
         LOG green "  $host_ip"
         LOG blue  "  port: $host_port"
         [ -n "$detail" ] && LOG "  ${detail:0:55}"
-        LOG "  UP/DOWN=nav  B=done"
+        LOG "  UP/DOWN=nav  B=done  >=harvest"
 
         local btn
         btn=$(WAIT_FOR_INPUT)
         case "$btn" in
-            UP)   [ $idx -gt 0 ] && idx=$((idx - 1)) ;;
-            DOWN) [ $idx -lt $((FOUND_COUNT - 1)) ] && idx=$((idx + 1)) ;;
+            UP)     [ $idx -gt 0 ] && idx=$((idx - 1)) ;;
+            DOWN)   [ $idx -lt $((FOUND_COUNT - 1)) ] && idx=$((idx + 1)) ;;
             B|LEFT) break ;;
+            *)
+                # RIGHT or any other key triggers harvest on this host
+                _do_harvest "$host_ip" "$host_port"
+                ;;
         esac
     done
 }
