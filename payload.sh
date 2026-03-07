@@ -1,42 +1,28 @@
 #!/bin/bash
 # =============================================================================
 # CLAWHunter — OpenClaw Instance Discovery Payload
-# For the Hak5 WiFi Pineapple Pager
+# For the Hak5 WiFi Pineapple Pager (480×222 px, 16-bit color, 221 PPI)
 # =============================================================================
 #
 # PURPOSE:
-#   Scans the local LAN (or a user-specified subnet) for live OpenClaw gateway
-#   instances by probing the default port (18790) and optional wide range.
-#   Confirms discovered ports are actually OpenClaw via HTTP fingerprinting.
-#   Displays live results on the Pager display, logs all findings to loot.
+#   Scans the local LAN (or user-specified subnet) for live OpenClaw gateway
+#   instances by probing port 18790 (default) with optional wide range sweep.
+#   Confirms discoveries via HTTP fingerprinting. Provides full hardware
+#   integration: color display, LED indicators, haptic feedback, audio cues,
+#   and an interactive post-scan results browser.
 #
 # DEPLOY:
-#   Copy this file to /root/payloads/user/reconnaissance/clawhunter/payload.sh
-#   on the WiFi Pineapple Pager.
+#   /root/payloads/user/reconnaissance/clawhunter/payload.sh
 #
-# CONTROLS (during scan):
+# CONTROLS:
+#   Standard picker navigation (UP/DOWN/LEFT/RIGHT/B)
 #   B button — abort scan in progress
-#
-# NAVIGATION:
-#   Standard Pager picker navigation for subnet, port, and options.
+#   Post-scan browser: UP/DOWN=navigate, B=exit
 #
 # LOG OUTPUT:
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.log
 #
-# OPENCLAW PORTS:
-#   Default: 18790
-#   Wide range: 18780–18800 (user selectable)
-#   Custom: user can specify any port via NUMBER_PICKER
-#
-# FINGERPRINTING:
-#   Port open + HTTP 400/401/403 on port 18790 = likely OpenClaw gateway
-#   Response body containing "openclaw" or "gateway" = confirmed
-#   Any HTTP response on the OpenClaw port range = flagged as candidate
-#
-# DEPENDENCIES:
-#   nmap, curl, nc (all present on Pager firmware)
-#
-# VERSION: 1.0.0
+# VERSION: 2.0.0
 # AUTHOR:  doublegate (doublegate)
 # REPO:    https://github.com/doublegate/CLAWHunter
 # =============================================================================
@@ -47,48 +33,140 @@ OPENCLAW_DEFAULT_PORT=18790
 OPENCLAW_RANGE_LOW=18780
 OPENCLAW_RANGE_HIGH=18800
 LOOT_BASE="/root/loot/clawhunter"
-PAYLOAD_VERSION="1.0.0"
+PAYLOAD_VERSION="2.0.0"
 
-# ── Setup loot directory ──────────────────────────────────────────────────────
+# ── State ─────────────────────────────────────────────────────────────────────
 
-mkdir -p "$LOOT_BASE"
-SCAN_ID="$(date +%Y%m%d_%H%M%S)"
-LOG_FILE="$LOOT_BASE/scan_${SCAN_ID}.log"
 FOUND_COUNT=0
 HOSTS_SCANNED=0
 ABORT=0
+FOUND_HOSTS=()      # array of "IP:PORT" strings for results browser
+SCAN_ID="$(date +%Y%m%d_%H%M%S)"
+LOG_FILE=""
+
+mkdir -p "$LOOT_BASE"
+
+# ── Cleanup trap ──────────────────────────────────────────────────────────────
+
+cleanup() {
+    led_off
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && {
+        echo "" >> "$LOG_FILE"
+        echo "[$(date '+%H:%M:%S')] Payload exited (cleanup trap)" >> "$LOG_FILE"
+    }
+}
+trap cleanup EXIT INT TERM
+
+# ── LED control ───────────────────────────────────────────────────────────────
+# Uses the Pager's RGB LED array via HAK5_API_POST.
+# 4 LEDs, each RGB as [R,G,B] booleans. onms/offms = blink timing.
+
+. /lib/hak5/commands.sh 2>/dev/null || true
+
+led_post() {
+    HAK5_API_POST "system/led" "$1" >/dev/null 2>&1 || true
+}
+
+led_off() {
+    led_post '{"color":"custom","raw_pattern":[{"onms":100,"offms":0,"next":false,"rgb":{"1":[false,false,false],"2":[false,false,false],"3":[false,false,false],"4":[false,false,false]}}]}'
+}
+
+led_scanning() {
+    # Slow blue pulse — scanning in progress
+    led_post '{"color":"custom","raw_pattern":[{"onms":600,"offms":400,"next":false,"rgb":{"1":[false,false,true],"2":[false,false,true],"3":[false,false,true],"4":[false,false,true]}}]}'
+}
+
+led_found() {
+    # Fast green flash — confirmed discovery
+    led_post '{"color":"custom","raw_pattern":[{"onms":150,"offms":150,"next":false,"rgb":{"1":[false,true,false],"2":[false,true,false],"3":[false,true,false],"4":[false,true,false]}}]}'
+}
+
+led_candidate() {
+    # Slow blue/green alternate — candidate (unconfirmed)
+    led_post '{"color":"custom","raw_pattern":[{"onms":300,"offms":200,"next":true,"rgb":{"1":[false,false,true],"2":[false,false,true],"3":[false,false,true],"4":[false,false,true]}},{"onms":300,"offms":200,"next":false,"rgb":{"1":[false,true,false],"2":[false,true,false],"3":[false,true,false],"4":[false,true,false]}}]}'
+}
+
+led_error() {
+    # Solid red — error state
+    led_post '{"color":"custom","raw_pattern":[{"onms":5000,"offms":0,"next":false,"rgb":{"1":[true,false,false],"2":[true,false,false],"3":[true,false,false],"4":[true,false,false]}}]}'
+}
+
+led_complete_ok() {
+    # Slow green pulse — scan done, found something
+    led_post '{"color":"custom","raw_pattern":[{"onms":800,"offms":400,"next":false,"rgb":{"1":[false,true,false],"2":[false,true,false],"3":[false,true,false],"4":[false,true,false]}}]}'
+}
+
+led_complete_none() {
+    # Slow blue pulse — scan done, nothing found
+    led_post '{"color":"custom","raw_pattern":[{"onms":800,"offms":400,"next":false,"rgb":{"1":[false,false,true],"2":[false,false,true],"3":[false,false,true],"4":[false,false,true]}}]}'
+}
+
+# ── Audio (RTTTL) ─────────────────────────────────────────────────────────────
+# RINGTONE uses RTTTL format: "Name:d=dur,o=oct,b=bpm:notes"
+# Run in background (&) to not block execution.
+
+ringtone_start() {
+    RINGTONE "start:d=8,o=5,b=180:c,e,g" &
+}
+
+ringtone_found() {
+    # Ascending alert — confirmed OpenClaw found
+    RINGTONE "found:d=8,o=5,b=220:e,e,g,g,b,b" &
+}
+
+ringtone_candidate() {
+    # Single short beep — port open, unconfirmed
+    RINGTONE "ping:d=16,o=5,b=200:g" &
+}
+
+ringtone_complete_ok() {
+    # Victory jingle
+    RINGTONE "win:d=4,o=5,b=160:c,e,g,c6" &
+}
+
+ringtone_complete_none() {
+    # Descending close
+    RINGTONE "none:d=4,o=5,b=140:g,e,c" &
+}
+
+ringtone_abort() {
+    RINGTONE "abort:d=4,o=4,b=120:g,e" &
+}
 
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
 log_entry() {
-    # Append a timestamped entry to the log file
     echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
 log_found() {
-    # Format: [FOUND] IP:PORT | HTTP_CODE | banner snippet
-    echo "[FOUND] $1" >> "$LOG_FILE"
-    FOUND_COUNT=$((FOUND_COUNT + 1))
+    echo "[FOUND]     $1" >> "$LOG_FILE"
 }
 
 log_candidate() {
-    # Port open but unconfirmed as OpenClaw
     echo "[CANDIDATE] $1" >> "$LOG_FILE"
+}
+
+log_section() {
+    echo "" >> "$LOG_FILE"
+    echo "── $1 ──" >> "$LOG_FILE"
 }
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 
-LOG cyan "  ✦ CLAWHunter v${PAYLOAD_VERSION}"
+LOG blue "  ✦ CLAWHunter v${PAYLOAD_VERSION}"
 LOG "  OpenClaw Discovery"
-LOG dim "  WiFi Pineapple Pager"
-sleep 2
+LOG blue "  WiFi Pineapple Pager"
+sleep 1
+ringtone_start
+sleep 1
 
 # ── Auto-detect local subnet ──────────────────────────────────────────────────
 
 LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | head -1)
 if [ -z "$LOCAL_IP" ]; then
-    # Fallback: grab first non-loopback address
-    LOCAL_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d/ -f1 | head -1)
+    LOCAL_IP=$(ip addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' \
+               | awk '{print $2}' | cut -d/ -f1 | head -1)
 fi
 
 DEFAULT_SUBNET="192.168.1"
@@ -96,85 +174,101 @@ if [ -n "$LOCAL_IP" ]; then
     DEFAULT_SUBNET=$(echo "$LOCAL_IP" | cut -d. -f1-3)
 fi
 
-LOG dim "Local IP: ${LOCAL_IP:-unknown}"
-LOG dim "Default subnet: ${DEFAULT_SUBNET}.0/24"
+LOG blue "Local: ${LOCAL_IP:-unknown}"
 sleep 1
 
-# ── User: select target subnet ────────────────────────────────────────────────
+# ── User: target subnet ───────────────────────────────────────────────────────
 
-IP_PICKER "Target Subnet" "$DEFAULT_SUBNET"
+SUBNET=$(IP_PICKER "Target Subnet" "$DEFAULT_SUBNET")
 case $? in
-    $DUCKYSCRIPT_CANCELLED)
+    $DUCKYSCRIPT_CANCELLED | $DUCKYSCRIPT_REJECTED | $DUCKYSCRIPT_ERROR)
         LOG red "Cancelled"
         exit $DUCKYSCRIPT_CANCELLED
         ;;
 esac
-SUBNET="$DUCKYSCRIPT_RESULT"
 
-# ── User: select primary port ─────────────────────────────────────────────────
+# ── User: primary port ────────────────────────────────────────────────────────
 
-NUMBER_PICKER "OpenClaw Port" $OPENCLAW_DEFAULT_PORT
+TARGET_PORT=$(NUMBER_PICKER "OpenClaw Port" $OPENCLAW_DEFAULT_PORT)
 case $? in
-    $DUCKYSCRIPT_CANCELLED)
+    $DUCKYSCRIPT_CANCELLED | $DUCKYSCRIPT_REJECTED | $DUCKYSCRIPT_ERROR)
         LOG red "Cancelled"
         exit $DUCKYSCRIPT_CANCELLED
         ;;
 esac
-TARGET_PORT="$DUCKYSCRIPT_RESULT"
 
-# ── User: wide range scan option ──────────────────────────────────────────────
+# ── User: wide port range ─────────────────────────────────────────────────────
 
-CONFIRMATION_DIALOG "Scan port range? (${OPENCLAW_RANGE_LOW}-${OPENCLAW_RANGE_HIGH})"
+resp=$(CONFIRMATION_DIALOG "Port range scan?" "Sweep ${OPENCLAW_RANGE_LOW}-${OPENCLAW_RANGE_HIGH} instead of port ${TARGET_PORT} only")
 WIDE_SCAN=0
-if [ $? -eq $DUCKYSCRIPT_USER_CONFIRMED ]; then
-    WIDE_SCAN=1
-fi
+case "$resp" in
+    $DUCKYSCRIPT_USER_CONFIRMED) WIDE_SCAN=1 ;;
+esac
 
-# ── User: host range (full /24 vs custom) ─────────────────────────────────────
+# ── User: host range ──────────────────────────────────────────────────────────
 
-CONFIRMATION_DIALOG "Full scan? (/24 = 254 hosts)"
-if [ $? -eq $DUCKYSCRIPT_USER_DENIED ]; then
-    # Narrow scan: .1–.50 (quick, covers most routers + a few clients)
-    HOST_START=1
-    HOST_END=50
-    LOG yellow "Quick scan (.1-.50)"
-else
-    HOST_START=1
-    HOST_END=254
-    LOG yellow "Full scan (.1-.254)"
-fi
-sleep 1
-
-# ── Write log header ──────────────────────────────────────────────────────────
-
-{
-    echo "=================================================="
-    echo "  CLAWHunter v${PAYLOAD_VERSION} — OpenClaw Discovery"
-    echo "  Hak5 WiFi Pineapple Pager"
-    echo "=================================================="
-    echo "Scan ID    : $SCAN_ID"
-    echo "Date/Time  : $(date)"
-    echo "Subnet     : ${SUBNET}.${HOST_START}-${HOST_END}"
-    echo "Primary Port: $TARGET_PORT"
-    echo "Wide Range  : $([ $WIDE_SCAN -eq 1 ] && echo 'YES ('${OPENCLAW_RANGE_LOW}'-'${OPENCLAW_RANGE_HIGH}')' || echo 'NO')"
-    echo "=================================================="
-    echo ""
-} > "$LOG_FILE"
+resp=$(CONFIRMATION_DIALOG "Full /24 scan?" "254 hosts — takes ~90s. NO = quick scan (.1-.50)")
+case "$resp" in
+    $DUCKYSCRIPT_USER_CONFIRMED)
+        HOST_START=1
+        HOST_END=254
+        ;;
+    *)
+        HOST_START=1
+        HOST_END=50
+        ;;
+esac
 
 # ── Build port list ───────────────────────────────────────────────────────────
 
 if [ $WIDE_SCAN -eq 1 ]; then
-    # Include primary port + full range (deduped)
     PORTS=$(seq $OPENCLAW_RANGE_LOW $OPENCLAW_RANGE_HIGH)
+    PORT_DESC="${OPENCLAW_RANGE_LOW}-${OPENCLAW_RANGE_HIGH}"
 else
     PORTS="$TARGET_PORT"
+    PORT_DESC="$TARGET_PORT"
 fi
 
-# ── Fingerprinting function ───────────────────────────────────────────────────
+# ── Write log header ──────────────────────────────────────────────────────────
 
-# Probe a single IP:PORT for OpenClaw.
-# Sets PROBE_CONFIRMED=1 if confirmed OpenClaw, PROBE_CANDIDATE=1 if port open
-# but unconfirmed, PROBE_HTTP_CODE to the HTTP status code.
+LOG_FILE="$LOOT_BASE/scan_${SCAN_ID}.log"
+
+{
+    echo "=============================================="
+    echo "  CLAWHunter v${PAYLOAD_VERSION} — OpenClaw Discovery"
+    echo "  Hak5 WiFi Pineapple Pager"
+    echo "=============================================="
+    echo "Scan ID     : $SCAN_ID"
+    echo "Date/Time   : $(date)"
+    echo "Scanner IP  : ${LOCAL_IP:-unknown}"
+    echo "Subnet      : ${SUBNET}.${HOST_START}-${HOST_END}"
+    echo "Port(s)     : $PORT_DESC"
+    echo "Wide range  : $([ $WIDE_SCAN -eq 1 ] && echo YES || echo NO)"
+    echo "=============================================="
+    echo ""
+} > "$LOG_FILE"
+
+# ── Scan start ────────────────────────────────────────────────────────────────
+
+RANGE_DESC="${SUBNET}.${HOST_START}-${HOST_END}"
+LOG green "Scanning: $RANGE_DESC"
+LOG blue "Ports: $PORT_DESC"
+sleep 1
+
+led_scanning
+
+SPINNER_ID=$(START_SPINNER "Scanning ${RANGE_DESC}...")
+
+log_section "HOST SCAN"
+
+# ── OpenClaw fingerprint probe ────────────────────────────────────────────────
+#
+# Stage 1: nc TCP handshake (fast, low cost)
+# Stage 2: curl HTTP probe — check body/headers for OpenClaw identifiers,
+#           or HTTP 400/401/403 on the exact target port (token-gated gateway)
+#
+# Sets: PROBE_CONFIRMED, PROBE_CANDIDATE, PROBE_HTTP_CODE, PROBE_BANNER
+
 probe_openclaw() {
     local ip="$1"
     local port="$2"
@@ -183,48 +277,41 @@ probe_openclaw() {
     PROBE_HTTP_CODE=""
     PROBE_BANNER=""
 
-    # Quick TCP port check first (faster than curl timeout)
-    if ! nc -z -w 1 "$ip" "$port" 2>/dev/null; then
-        return 1   # Port closed — no point continuing
-    fi
+    # Stage 1: fast TCP check
+    nc -z -w 1 "$ip" "$port" 2>/dev/null || return 1
 
-    # Port is open — attempt HTTP fingerprint
-    local response
+    # Stage 2: HTTP fingerprint
+    local response http_code body body_lower
     response=$(curl -s \
         --max-time 3 \
         --connect-timeout 2 \
-        -w "\n__HTTP_CODE__:%{http_code}" \
-        -H "User-Agent: CLAWHunter/1.0" \
+        -w "\n__CODE__:%{http_code}" \
+        -H "User-Agent: CLAWHunter/${PAYLOAD_VERSION}" \
         "http://${ip}:${port}/" 2>/dev/null)
 
-    local curl_exit=$?
-    PROBE_HTTP_CODE=$(echo "$response" | grep '__HTTP_CODE__:' | cut -d: -f2)
-    local body
-    body=$(echo "$response" | grep -v '__HTTP_CODE__:')
+    http_code=$(echo "$response" | grep '__CODE__:' | cut -d: -f2)
+    body=$(echo "$response" | grep -v '__CODE__:')
+    body_lower=$(echo "$body" | tr '[:upper:]' '[:lower:]')
 
-    if [ -n "$PROBE_HTTP_CODE" ]; then
+    if [ -n "$http_code" ]; then
         PROBE_CANDIDATE=1
+        PROBE_HTTP_CODE="$http_code"
 
-        # Confirmed if body or headers mention openclaw/clawd/gateway
-        local body_lower
-        body_lower=$(echo "$body" | tr '[:upper:]' '[:lower:]')
+        # Explicit keyword confirmation
         if echo "$body_lower" | grep -qE 'openclaw|clawd|gateway'; then
             PROBE_CONFIRMED=1
-            PROBE_BANNER=$(echo "$body" | head -1 | cut -c1-60)
+            PROBE_BANNER=$(echo "$body" | grep -ioE 'openclaw[^"<]*|clawd[^"<]*' | head -1 | cut -c1-50)
+            [ -z "$PROBE_BANNER" ] && PROBE_BANNER="keyword match in response body"
             return 0
         fi
 
-        # Also confirmed if port matches our primary target and HTTP auth rejected
-        # (401/403 on port 18790 is a very strong signal — it's a token-gated gateway)
+        # Port-specific auth rejection — strong signal on the default port
         if [ "$port" -eq "$TARGET_PORT" ] && \
-           echo "$PROBE_HTTP_CODE" | grep -qE '^(401|403|400)$'; then
+           echo "$http_code" | grep -qE '^(400|401|403)$'; then
             PROBE_CONFIRMED=1
-            PROBE_BANNER="HTTP ${PROBE_HTTP_CODE} (auth required)"
+            PROBE_BANNER="HTTP ${http_code} — token-gated gateway"
             return 0
         fi
-    elif [ $curl_exit -eq 0 ]; then
-        # TCP connected, no HTTP response — note as candidate (might be different protocol)
-        PROBE_CANDIDATE=1
     fi
 
     return 0
@@ -232,15 +319,10 @@ probe_openclaw() {
 
 # ── Main scan loop ─────────────────────────────────────────────────────────────
 
-LOG cyan "Starting scan..."
-LOG dim "${SUBNET}.${HOST_START}-${HOST_END}"
-sleep 1
-
-SPINNER_ID=$(START_SPINNER "Scanning hosts...")
-
 for i in $(seq $HOST_START $HOST_END); do
-    # Check for B-button abort between hosts
-    if WAIT_FOR_BUTTON_PRESS B 0 2>/dev/null; then
+    # Non-blocking B-button abort check via WAIT_FOR_INPUT with 0 timeout
+    btn=$(timeout 0.05 sh -c 'WAIT_FOR_INPUT 2>/dev/null' 2>/dev/null || true)
+    if [ "$btn" = "B" ]; then
         ABORT=1
         break
     fi
@@ -248,80 +330,155 @@ for i in $(seq $HOST_START $HOST_END); do
     IP="${SUBNET}.${i}"
     HOSTS_SCANNED=$((HOSTS_SCANNED + 1))
 
-    # Quick ping to avoid wasting time on dead hosts
-    if ! ping -c 1 -W 1 "$IP" &>/dev/null; then
-        continue
-    fi
+    ping -c 1 -W 1 "$IP" &>/dev/null || continue
 
-    # Host is alive — stop spinner to log, then restart
+    # Live host — update display
     STOP_SPINNER "$SPINNER_ID"
-    LOG dim "Live: $IP"
+    LOG blue "Live: $IP"
     log_entry "Host alive: $IP"
-
     SPINNER_ID=$(START_SPINNER "Probing $IP...")
 
-    HOST_FOUND=0
+    HOST_HAD_FIND=0
+
     for PORT in $PORTS; do
-        probe_openclaw "$IP" "$PORT"
+        probe_openclaw "$IP" "$PORT" || continue
 
         if [ $PROBE_CONFIRMED -eq 1 ]; then
             STOP_SPINNER "$SPINNER_ID"
+
+            # ── Confirmed find: full hardware alert ───────────────────────────
+            led_found
+            ringtone_found
+            VIBRATE 300
+
             LOG green "✦ FOUND: ${IP}:${PORT}"
             LOG green "  ${PROBE_BANNER}"
             log_found "${IP}:${PORT} | HTTP ${PROBE_HTTP_CODE} | ${PROBE_BANNER}"
-            HOST_FOUND=1
+
+            FOUND_HOSTS+=("${IP}:${PORT}")
+            FOUND_COUNT=$((FOUND_COUNT + 1))
+            HOST_HAD_FIND=1
+
+            # ── Pause on find (user-requested) ────────────────────────────────
+            ALERT "✦ OpenClaw Found!\n${IP}:${PORT}\n${PROBE_BANNER}\nPress any key to continue scan"
+
+            led_scanning
             SPINNER_ID=$(START_SPINNER "Scanning...")
+
         elif [ $PROBE_CANDIDATE -eq 1 ]; then
             STOP_SPINNER "$SPINNER_ID"
-            LOG yellow "? PORT OPEN: ${IP}:${PORT} (HTTP ${PROBE_HTTP_CODE})"
+            led_candidate
+            ringtone_candidate
+
+            LOG blue "? Open: ${IP}:${PORT} (HTTP ${PROBE_HTTP_CODE})"
             log_candidate "${IP}:${PORT} | HTTP ${PROBE_HTTP_CODE} (unconfirmed)"
+
+            sleep 1
+            led_scanning
             SPINNER_ID=$(START_SPINNER "Scanning...")
         fi
     done
 
-    if [ $HOST_FOUND -eq 1 ]; then
-        log_entry "  └─ OpenClaw found on $IP"
+    if [ $HOST_HAD_FIND -eq 1 ]; then
+        log_entry "  └─ OpenClaw confirmed on $IP"
     fi
 done
 
 STOP_SPINNER "$SPINNER_ID"
 
-# ── Handle abort ──────────────────────────────────────────────────────────────
+# ── Abort handling ────────────────────────────────────────────────────────────
 
 if [ $ABORT -eq 1 ]; then
-    LOG red "Scan aborted"
-    log_entry "SCAN ABORTED by user"
+    ringtone_abort
+    LOG red "Scan aborted by user"
+    log_entry "SCAN ABORTED BY USER"
 fi
 
-# ── Write log footer ──────────────────────────────────────────────────────────
+# ── Log footer ────────────────────────────────────────────────────────────────
 
 {
     echo ""
-    echo "=================================================="
+    echo "=============================================="
     echo "SUMMARY"
-    echo "  Hosts scanned : $HOSTS_SCANNED"
-    echo "  OpenClaw found: $FOUND_COUNT"
-    echo "  Status        : $([ $ABORT -eq 1 ] && echo 'ABORTED' || echo 'COMPLETE')"
-    echo "  Elapsed       : $SECONDS seconds"
-    echo "  Log saved     : $LOG_FILE"
-    echo "=================================================="
+    echo "  Hosts scanned  : $HOSTS_SCANNED"
+    echo "  OpenClaw found : $FOUND_COUNT"
+    echo "  Elapsed        : ${SECONDS}s"
+    echo "  Status         : $([ $ABORT -eq 1 ] && echo 'ABORTED' || echo 'COMPLETE')"
+    if [ $FOUND_COUNT -gt 0 ]; then
+        echo ""
+        echo "  DISCOVERED INSTANCES:"
+        for h in "${FOUND_HOSTS[@]}"; do
+            echo "    ✦ $h"
+        done
+    fi
+    echo "=============================================="
+    echo "  Log: $LOG_FILE"
+    echo "=============================================="
 } >> "$LOG_FILE"
 
-# ── Results screen ────────────────────────────────────────────────────────────
+# ── Results summary screen ────────────────────────────────────────────────────
 
 if [ $FOUND_COUNT -gt 0 ]; then
-    LOG green "Scan Complete"
+    led_complete_ok
+    ringtone_complete_ok
+    VIBRATE 500
+    LOG green "Scan Complete!"
     LOG green "Found: $FOUND_COUNT OpenClaw"
-    LOG dim "Scanned: $HOSTS_SCANNED hosts"
+    LOG blue  "Scanned: $HOSTS_SCANNED hosts"
 else
-    LOG yellow "Scan Complete"
-    LOG yellow "No instances found"
-    LOG dim "Scanned: $HOSTS_SCANNED hosts"
+    led_complete_none
+    ringtone_complete_none
+    LOG blue "Scan Complete"
+    LOG red  "No instances found"
+    LOG blue "Scanned: $HOSTS_SCANNED hosts"
 fi
 
-LOG dim "Log: $LOG_FILE"
 sleep 1
 
-PROMPT "Done — press any key"
+# ── Interactive results browser ───────────────────────────────────────────────
+# Allows navigating discovered hosts one at a time with UP/DOWN,
+# then exit with B. Only shown if at least one host was found.
 
+if [ $FOUND_COUNT -gt 0 ]; then
+    PROMPT "Press any key to browse results"
+
+    idx=0
+    while true; do
+        host="${FOUND_HOSTS[$idx]}"
+        host_ip="${host%%:*}"
+        host_port="${host##*:}"
+
+        LOG green "Results ${idx+1}/${FOUND_COUNT}"
+        LOG green "  $host_ip"
+        LOG blue  "  port: $host_port"
+        LOG       "  UP/DOWN=nav  B=exit"
+
+        btn=$(WAIT_FOR_INPUT)
+        case "$btn" in
+            UP)
+                if [ $idx -gt 0 ]; then
+                    idx=$((idx - 1))
+                fi
+                ;;
+            DOWN)
+                if [ $idx -lt $((FOUND_COUNT - 1)) ]; then
+                    idx=$((idx + 1))
+                fi
+                ;;
+            B | LEFT)
+                break
+                ;;
+        esac
+    done
+fi
+
+# ── Final screen ──────────────────────────────────────────────────────────────
+
+LOG blue "Log saved:"
+LOG      "$LOG_FILE"
+sleep 1
+
+PROMPT "Done — press any key to exit"
+
+led_off
 exit 0

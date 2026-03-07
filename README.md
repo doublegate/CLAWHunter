@@ -1,85 +1,156 @@
 # ✦ CLAWHunter
 
-A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) payload that scans the local LAN for live [OpenClaw](https://docs.openclaw.ai) AI agent gateway instances. Probes the default OpenClaw port, optionally sweeps a wider range, fingerprints HTTP responses to confirm discovery, and logs all findings to loot.
+A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) payload that scans the local LAN for live [OpenClaw](https://docs.openclaw.ai) AI gateway instances. Full hardware integration: color display, RGB LEDs, haptic feedback, audio cues, and an interactive post-scan results browser.
 
 ![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
 ![Language](https://img.shields.io/badge/script-DuckyScript%20%2F%20Bash-yellow)
 ![Category](https://img.shields.io/badge/category-Reconnaissance-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-green)
+
+---
+
+## Hardware features used
+
+| Hardware | Usage |
+|----------|-------|
+| **480×222 px 16-bit color display** | Color-coded LOG output (blue=info, green=found, red=error), interactive pickers, ALERT popups, results browser |
+| **RGB LED array (4 LEDs)** | Blue pulse = scanning, fast green flash = confirmed find, alternating blue/green = candidate, solid red = error, slow green pulse = complete |
+| **Haptic (vibration)** | Short 300ms on candidate, strong 500ms on confirmed find, extended 500ms on scan complete |
+| **Audio (RINGTONE / RTTTL)** | Startup tone, ascending alert on find, ping on candidate, victory jingle on completion, descending on no results |
+| **5-button navigation** | UP/DOWN for pickers and results browser, B to abort scan or exit browser |
 
 ---
 
 ## What it does
 
 1. **Auto-detects** the current subnet from the Pager's network interface
-2. **Prompts** for target subnet, port, and scan options via the display + buttons
-3. **Scans** the selected host range with a live-host check (ping) before port probing
-4. **Probes** each live host on the selected port(s) using `nc` (fast TCP check) then `curl` (HTTP fingerprint)
-5. **Fingerprints** HTTP responses to confirm OpenClaw vs. any other service on the port
-6. **Displays** real-time results on the Pager screen as hosts are found
-7. **Logs** all discoveries, candidates, and summary to `/root/loot/clawhunter/`
+2. **Prompts** for target subnet, port, and scan mode via the color display
+3. **Scans** the host range — pings first (fast host filter), then port probes live hosts
+4. **Fingerprints** open ports via HTTP to confirm or classify each discovery
+5. **Alerts immediately** on each confirmed find: LED flash + vibration + audio + `ALERT` popup that pauses the scan until dismissed
+6. **Saves logs** with timestamped entries to `/root/loot/clawhunter/`
+7. **Opens a results browser** after the scan — navigate all found instances with UP/DOWN, exit with B
 
 ---
 
 ## Deploy
 
-Copy the payload to the Pager:
-
 ```bash
-# From the Pager's web UI: Payloads → Upload
-# Or via SSH:
+# Via SSH (replace pineapple.lan with your device IP):
+ssh root@pineapple.lan "mkdir -p /root/payloads/user/reconnaissance/clawhunter"
 scp payload.sh root@pineapple.lan:/root/payloads/user/reconnaissance/clawhunter/payload.sh
-```
 
-The payload must live at:
-```
-/root/payloads/user/reconnaissance/clawhunter/payload.sh
+# Or via the Pager web UI: Payloads → Upload
 ```
 
 ---
 
 ## Usage
 
-1. Launch from the Pager UI (Payloads → reconnaissance → clawhunter) or from the device menu
-2. Follow the on-screen prompts:
+Launch from **Payloads → reconnaissance → clawhunter** in the Pager UI.
+
+Follow the on-screen prompts:
 
 | Prompt | Default | Description |
 |--------|---------|-------------|
-| Target Subnet | Auto-detected (e.g. `192.168.1`) | First three octets of target range |
+| Target Subnet | Auto-detected (e.g. `192.168.1`) | First three octets |
 | OpenClaw Port | `18790` | Primary port to probe |
-| Scan port range? | No | Sweep ports `18780–18800` instead of single port |
-| Full scan? | Yes | `/24` (254 hosts) or quick scan (`.1–.50`) |
-
-3. Watch live results on the display as hosts are found
-4. Press **B** at any time to abort the scan cleanly
-5. Press any button on the final screen to exit
+| Port range scan? | No | Sweep `18780–18800` instead of single port |
+| Full /24 scan? | Yes | 254 hosts (~90s) or quick scan `.1–.50` (~20s) |
 
 ---
 
 ## Controls
 
-| Button | Action |
-|--------|--------|
-| Standard navigation | Picker navigation (up/down/select) |
-| **B** | Abort scan in progress (mid-scan) |
-| Any button | Dismiss final results screen |
+| Button | Context | Action |
+|--------|---------|--------|
+| UP/DOWN | Pickers | Adjust value |
+| B | Any picker | Cancel / exit |
+| B | During scan | Abort scan cleanly |
+| UP/DOWN | Results browser | Navigate found hosts |
+| B or LEFT | Results browser | Exit browser |
+| Any | ALERT popup | Dismiss and continue scan |
+| Any | Final PROMPT | Exit payload |
+
+---
+
+## Display behavior
+
+**During setup:**
+```
+  ✦ CLAWHunter v2.0.0       ← blue
+  OpenClaw Discovery
+  WiFi Pineapple Pager       ← blue
+```
+
+**During scan (rolling log — most recent ~10 lines visible):**
+```
+  Scanning: 192.168.4.1-254  ← green
+  Ports: 18790               ← blue
+  Live: 192.168.4.6          ← blue
+  Live: 192.168.4.28         ← blue
+  ? Open: 192.168.4.50:18790 ← blue    (candidate)
+  Live: 192.168.4.100        ← blue
+  ✦ FOUND: 192.168.4.100:18790 ← green (confirmed!)
+    HTTP 401 — token-gated gateway ← green
+```
+
+**On confirmed find — ALERT popup (pauses scan):**
+```
+┌────────────────────────────┐
+│  ✦ OpenClaw Found!         │
+│  192.168.4.100:18790       │
+│  HTTP 401 — token-gated    │
+│  gateway                   │
+│  Press any key to continue │
+└────────────────────────────┘
+```
+
+**Scan complete:**
+```
+  Scan Complete!             ← green
+  Found: 1 OpenClaw          ← green
+  Scanned: 47 hosts          ← blue
+```
+
+**Results browser (if finds > 0):**
+```
+  Results 1/1                ← green
+    192.168.4.100            ← green
+    port: 18790              ← blue
+    UP/DOWN=nav  B=exit
+```
+
+---
+
+## LED states
+
+| State | Pattern | Color |
+|-------|---------|-------|
+| Scanning | Slow pulse (600ms on / 400ms off) | Blue |
+| Candidate port open | Alternating blue/green | Blue ↔ Green |
+| Confirmed OpenClaw | Fast flash (150ms) | Green |
+| Error / abort | Solid | Red |
+| Complete — found | Slow pulse (800ms) | Green |
+| Complete — none | Slow pulse (800ms) | Blue |
+| Exiting | Off | — |
 
 ---
 
 ## OpenClaw fingerprinting
 
-CLAWHunter uses a two-stage confirmation strategy:
+Two-stage detection:
 
 **Stage 1 — TCP port check** (`nc -z -w 1`)
-Fast connection attempt. Closed ports are skipped immediately.
+Fast, low-cost. Closed ports are skipped without an HTTP probe.
 
-**Stage 2 — HTTP fingerprint** (`curl`)
-For open ports, an HTTP GET is sent with a `CLAWHunter/1.0` User-Agent. The response is checked for:
+**Stage 2 — HTTP fingerprint** (`curl`, 3s timeout)
 
-| Signal | Confidence |
-|--------|-----------|
-| Body contains `openclaw`, `clawd`, or `gateway` | ✅ **Confirmed** |
-| HTTP 401/403/400 on the primary target port (18790) | ✅ **Confirmed** (token-gated gateway) |
-| Any HTTP response on port range | ⚠️ **Candidate** (logged, displayed in yellow) |
+| Signal | Classification |
+|--------|---------------|
+| Response body contains `openclaw`, `clawd`, or `gateway` | ✅ **Confirmed** |
+| HTTP 400/401/403 on the primary target port | ✅ **Confirmed** (token-gated gateway) |
+| Any HTTP response on the port range | ⚠️ **Candidate** (logged in yellow) |
 
 ---
 
@@ -87,55 +158,48 @@ For open ports, an HTTP GET is sent with a `CLAWHunter/1.0` User-Agent. The resp
 
 | Port | Description |
 |------|-------------|
-| `18790` | OpenClaw gateway default (token-authenticated HTTP) |
-| `18780–18800` | Wide range sweep (covers non-default configs) |
+| `18790` | OpenClaw gateway default |
+| `18780–18800` | Wide range (covers non-default configs) |
 
-OpenClaw's gateway binds to `loopback` by default (`127.0.0.1`). Instances visible on the network have either changed `gateway.bind` to a network interface or are running behind a reverse proxy. This payload finds exactly those.
+> **Note:** OpenClaw binds to `loopback` by default. This payload finds instances where `gateway.bind` has been changed to a network interface, or those running behind a reverse proxy — exactly the configurations relevant for network-level discovery.
 
 ---
 
 ## Log output
 
-Logs are written to:
 ```
 /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.log
 ```
 
-Example log:
+Example:
 ```
-==================================================
-  CLAWHunter v1.0.0 — OpenClaw Discovery
-==================================================
-Scan ID    : 20260307_143512
-Subnet     : 192.168.4.1-254
-Primary Port: 18790
-Wide Range  : NO
-==================================================
+==============================================
+  CLAWHunter v2.0.0 — OpenClaw Discovery
+==============================================
+Scan ID     : 20260307_143512
+Scanner IP  : 192.168.4.150
+Subnet      : 192.168.4.1-254
+Port(s)     : 18790
+==============================================
 
+── HOST SCAN ──
 [14:35:14] Host alive: 192.168.4.6
-[14:35:15] Host alive: 192.168.4.28
-[14:35:16] Host alive: 192.168.4.100
-[FOUND] 192.168.4.100:18790 | HTTP 401 | HTTP 401 (auth required)
-  └─ OpenClaw found on 192.168.4.100
-[14:35:22] Host alive: 192.168.4.216
+[14:35:16] Host alive: 192.168.4.28
+[14:35:19] Host alive: 192.168.4.100
+[FOUND]     192.168.4.100:18790 | HTTP 401 | HTTP 401 — token-gated gateway
+[14:35:19]   └─ OpenClaw confirmed on 192.168.4.100
 
-==================================================
+==============================================
 SUMMARY
-  Hosts scanned : 254
-  OpenClaw found: 1
-  Status        : COMPLETE
-  Elapsed       : 87 seconds
-==================================================
+  Hosts scanned  : 254
+  OpenClaw found : 1
+  Elapsed        : 87s
+  Status         : COMPLETE
+
+  DISCOVERED INSTANCES:
+    ✦ 192.168.4.100:18790
+==============================================
 ```
-
----
-
-## Notes
-
-- Full `/24` scans take approximately 60–120 seconds depending on network size and response times
-- Quick scan (`.1–.50`) covers most common gateway/server address ranges and completes faster
-- Wide range mode (`18780–18800`) increases scan time proportionally — 21× more port probes per host
-- OpenClaw instances with `gateway.bind: loopback` (the default) will **not** appear in network scans — only instances explicitly bound to a network interface or behind a proxy
 
 ---
 
