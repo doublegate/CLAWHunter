@@ -1,6 +1,6 @@
 # ✦ CLAWHunter
 
-![WiFi Pineapple Pager](images/pager-transparent.png)
+<img src="images/pager-transparent.png" width="450" alt="WiFi Pineapple Pager">
 
 A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) payload **suite** for discovering and exploiting [OpenClaw](https://docs.openclaw.ai) AI gateway instances on local networks. Three payload variants — interactive, recon-triggered, and alert-fired — share a common fingerprinting library with full hardware integration: color display, RGB LEDs, haptic feedback, audio cues, interactive results browser, and an integrated post-exploitation harvest engine.
 
