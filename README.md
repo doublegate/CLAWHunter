@@ -5,7 +5,28 @@ A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) paylo
 ![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
 ![Language](https://img.shields.io/badge/script-Bash-yellow)
 ![Category](https://img.shields.io/badge/category-Reconnaissance-blue)
-![Version](https://img.shields.io/badge/version-3.0.2-green)
+![Version](https://img.shields.io/badge/version-3.0.3-green)
+
+---
+
+## What's new in v3.0.3
+
+| Change | Detail |
+|--------|--------|
+| **Timing dither** | Each scan profile now applies a randomized inter-probe delay (base + jitter). Breaks the metronomic timing signature that stateful IDS engines key on. Works alongside the existing randomized host order (Feature 4) for a two-axis evasion approach: *what* is scanned is shuffled, *when* it is probed is dithered. |
+| **Dead import removed** | `hashlib` was imported but never called in `harvest.py`. Removed. |
+
+### Dither values per profile
+
+| Profile | Base delay | Max jitter | Total max | Intent |
+|---------|-----------|-----------|-----------|--------|
+| GHOST | 0 ms | 0 ms | 0 ms | Passive only — no probes |
+| QUIET | 50 ms | 200 ms | 250 ms | Mimics human-paced browsing; very low IDS signature |
+| NORMAL | 0 ms | 80 ms | 80 ms | Breaks metronomic timing without slowing scan |
+| FAST | 0 ms | 25 ms | 25 ms | Minimal — enough to avoid exact-interval detection |
+| AGGRESSIVE | 0 ms | 0 ms | 0 ms | Speed priority; IDS risk accepted |
+
+Jitter uses `$RANDOM % (max+1)` — bash builtin, no external tools.
 
 ---
 
@@ -171,13 +192,13 @@ Launch from **Payloads → user → clawhunter** in the Pager UI.
 
 ## Scan speed profiles (F4)
 
-| Profile | Behavior | Notes |
-|---------|----------|-------|
-| **GHOST** | Passive only — mDNS monitor + ARP cache harvest, no port probes | Leaves zero active traffic |
-| **QUIET** | 50ms inter-host delay, silent mode forced | Low signature, no audio |
-| **NORMAL** | Sequential probes, current default behavior | Balanced |
-| **FAST** | Parallel background probes (3 hosts at a time) | ~3× throughput |
-| **AGGRESSIVE** | All ports + extended ports, 5 parallel probes | Maximum coverage |
+| Profile | Behavior | Dither (base + jitter) | Notes |
+|---------|----------|----------------------|-------|
+| **GHOST** | Passive only — mDNS monitor + ARP cache harvest, no port probes | none | Zero active traffic |
+| **QUIET** | Sequential probes, 50ms floor, silent forced | 50ms + 0–200ms | Mimics human-paced browsing |
+| **NORMAL** | Sequential probes, default behavior | 0ms + 0–80ms | Breaks metronomic timing |
+| **FAST** | Parallel probes (3 hosts at a time) | 0ms + 0–25ms | Minimal jitter, ~3× throughput |
+| **AGGRESSIVE** | All ports + extended, 5 parallel probes | none | Speed priority, IDS risk accepted |
 
 ---
 

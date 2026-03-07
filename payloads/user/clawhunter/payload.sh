@@ -4,7 +4,7 @@
 # For the Hak5 WiFi Pineapple Pager (480×222 px, 16-bit color, 221 PPI)
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.0.0
+# PAYLOAD_VERSION: 3.0.3
 # AUTHOR:  doublegate (doublegate)
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -41,7 +41,7 @@
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.json
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.0.0"
+readonly PAYLOAD_VERSION="3.0.3"
 readonly OPENCLAW_DEFAULT_PORT=18790
 readonly OPENCLAW_RANGE_LOW=18780
 readonly OPENCLAW_RANGE_HIGH=18800
@@ -78,6 +78,12 @@ WIFI_CONNECTED=0
 
 # v3 state
 SCAN_PROFILE="NORMAL"   # GHOST | QUIET | NORMAL | FAST | AGGRESSIVE
+
+# Timing dither — randomized inter-probe delay to reduce IDS timing signatures.
+# Applied after each host probe. Values in milliseconds (base + 0..jitter).
+# Set by apply_scan_profile(); overridden by --no-dither if added later.
+DITHER_BASE_MS=0        # fixed floor delay (ms) between probes
+DITHER_JITTER_MS=0      # additional random 0..JITTER_MS added per probe
 MAC_RANDOMIZED=0
 ORIG_MAC=""
 SCAN_IF=""
@@ -152,27 +158,57 @@ apply_scan_profile() {
             # Passive-only — no active port probes in run_scan(); handled by caller
             PROBE_DELAY_MS=0
             PARALLEL_COUNT=1
+            DITHER_BASE_MS=0
+            DITHER_JITTER_MS=0
             ;;
         QUIET)
+            # 50ms fixed floor + up to 200ms jitter — mimics human-paced browsing,
+            # very low IDS signature even on sensitive networks
             PROBE_DELAY_MS=50
             PARALLEL_COUNT=1
             SILENT=1   # force silent mode for QUIET profile
+            DITHER_BASE_MS=50
+            DITHER_JITTER_MS=200
             ;;
         NORMAL)
+            # No fixed floor, but 0–80ms jitter breaks the metronomic
+            # timing that stateful IDS engines key on
             PROBE_DELAY_MS=0
             PARALLEL_COUNT=1
+            DITHER_BASE_MS=0
+            DITHER_JITTER_MS=80
             ;;
         FAST)
+            # Minimal 0–25ms jitter — enough to avoid exact-interval signatures
+            # without meaningfully slowing down the scan
             PROBE_DELAY_MS=0
             PARALLEL_COUNT=3
+            DITHER_BASE_MS=0
+            DITHER_JITTER_MS=25
             ;;
         AGGRESSIVE)
+            # No dither — speed is the priority; accept the IDS risk
             PROBE_DELAY_MS=0
             PARALLEL_COUNT=5
             WIDE_SCAN=1
             EXTRA_PORTS=1
+            DITHER_BASE_MS=0
+            DITHER_JITTER_MS=0
             ;;
     esac
+}
+
+# ── Timing dither helper ──────────────────────────────────────────────────────
+# Sleeps for DITHER_BASE_MS + a random fraction of DITHER_JITTER_MS.
+# Uses $RANDOM (bash builtin, 0–32767) so no external tools needed.
+
+apply_dither() {
+    local total_ms=$DITHER_BASE_MS
+    if [ "$DITHER_JITTER_MS" -gt 0 ]; then
+        # $RANDOM % (JITTER+1) gives 0..JITTER_MS
+        total_ms=$(( DITHER_BASE_MS + (RANDOM % (DITHER_JITTER_MS + 1)) ))
+    fi
+    [ "$total_ms" -gt 0 ] && sleep "0.$(printf '%03d' "$((total_ms % 1000))")"
 }
 
 # ── Core scan loop ────────────────────────────────────────────────────────────
@@ -368,9 +404,8 @@ _run_port_scan() {
             log_entry "Probing: $IP ($probe_idx/${TOTAL_LIVE}, ${pct}%)"
             SID=$(START_SPINNER "${pct}% — ${IP} ($probe_idx/${TOTAL_LIVE})...")
 
-            # Inter-probe delay for QUIET profile
-            [ "${PROBE_DELAY_MS:-0}" -gt 0 ] && \
-                sleep "0.$(printf '%03d' "$PROBE_DELAY_MS")"
+            # Timing dither — randomized inter-probe delay to reduce IDS signature
+            apply_dither
 
             local HOST_HAD_FIND=0
             for PORT in $ALL_PORTS; do
