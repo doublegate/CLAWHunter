@@ -52,10 +52,11 @@ CLAWHunter/
 
 ### Hardware requirements
 
-- Hak5 WiFi Pineapple Pager
-- MicroSD card (for opkg package installs)
+- Hak5 WiFi Pineapple Pager (4 GB internal eMMC — no microSD required)
 
 ### Optional packages (install via SSH on the Pager)
+
+> The `-d mmc` flag installs to the Pager's internal 4 GB eMMC partition (where `/root`, payloads, and loot live), not a microSD card. The root overlay has <32 MB free after firmware — always use `-d mmc` for larger packages like python3.
 
 ```bash
 opkg update
