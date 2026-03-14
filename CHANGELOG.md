@@ -4,6 +4,31 @@ All notable changes to CLAWHunter are documented here.
 
 ---
 
+## [v4.0.0-m1] — 2026-03-14
+
+### Added — Native Monstatek M1 Port (`M1` branch)
+- **Full native C port** of all three CLAWHunter payload modes (recon, user, alert) compiled directly into the M1 firmware (`m1_csrc/m1_clawhunter.c`, `m1_clawhunter.h`).
+- **ESP32 TCP probe handler** (`tcp_connect_probe()` in `esp_app_main.c`) — implements `AT+CIPSTART` → `AT+CIPSEND` (HTTP GET) → `+IPD` banner read → `AT+CIPCLOSE` flow over the SPI AT command interface.
+- **SPI protocol extension** — `CTRL_REQ_TCP_CONNECT` enum, `tcp_connect_t` struct (IP, port, timeout, result code, 64-byte banner buffer), and `ctrl_cmd_t` union field added to `ctrl_api.h`.
+- **AT command defines** — `ESP32C6_AT_REQ_CIPSTART`, `CIPCLOSE`, `CIPSEND`, `IPD` response prefix added to `esp_at_list.h`.
+- **M1 main menu integration** — CLAWHunter appears as a top-level menu item (after Sub-GHz) with Recon/User/Alert sub-menu, item counts corrected across all 4 preprocessor branches.
+- **Scan profile picker** — D-pad-driven UI for selecting Ghost/Quiet/Normal/Fast/Aggressive profiles on the 128×64 monochrome OLED.
+- **Progress bar** — real-time scan progress with percentage display at screen bottom during subnet sweeps.
+- **Scrollable results list** — UP/DOWN to scroll through discovered instances, BACK to exit.
+- **OpenClaw signature detection** — banner checked for `openclaw`, `OpenClaw`, and `clawd` keywords; confirmed vs. candidate classification.
+- **Buzzer feedback** — dual-tone alert (2000 Hz + 2500 Hz) via `m1_buzzer_set()` on confirmed discovery.
+- **Graceful fallback** — if ESP32 firmware doesn't support TCP connect yet, falls through to ARP-level candidate marking.
+- **Technical documentation** — `docs/M1-PORT.md` covering architecture, hardware differences, build instructions, memory footprint, protocol extension details, and file manifest.
+- **Build system** — `m1_clawhunter.c` added to `cmake/m1_01/CMakeLists.txt`; path fixes for FatFs, Infrared, and Middlewares directories.
+- **Vendored dependencies** — M1 firmware (`Monstatek/M1`) and SDK (`Monstatek/m1-sdk`) vendored in `vendor/` with `.git` directories removed.
+
+### Build
+- Compiles clean with `arm-none-eabi-gcc 14.2.0` on Linux (CachyOS/Arch)
+- Final firmware: 655,968 bytes text, 10,524 data, 251,544 BSS (49.9% of 1MB flash)
+- Output: `vendor/M1/artifacts/M1_v0800_C3.1_wCRC.bin` (CRC-stamped, ready to flash)
+
+---
+
 ## [v3.2.0] — 2026-03-07
 
 ### Added

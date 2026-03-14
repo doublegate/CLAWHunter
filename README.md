@@ -5,9 +5,12 @@
 A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) payload **suite** for discovering and exploiting [OpenClaw](https://docs.openclaw.ai) AI gateway instances on local networks. Three payload variants — interactive, recon-triggered, and alert-fired — share a common fingerprinting library with full hardware integration: color display, RGB LEDs, haptic feedback, audio cues, interactive results browser, and an integrated post-exploitation harvest engine.
 
 ![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
-![Language](https://img.shields.io/badge/script-Bash%20%2B%20Python3-yellow)
+![Platform](https://img.shields.io/badge/platform-Monstatek%20M1-orange)
+![Language](https://img.shields.io/badge/script-Bash%20%2B%20Python3%20%7C%20C-yellow)
 ![Category](https://img.shields.io/badge/category-Reconnaissance%20%2F%20Exploitation-blue)
-![Version](https://img.shields.io/badge/version-3.2.0-green)
+![Version](https://img.shields.io/badge/version-3.2.0%20%7C%204.0.0--m1-green)
+
+> **M1 branch available** — CLAWHunter has been natively ported to the [Monstatek M1](https://github.com/Monstatek/M1) firmware as compiled C. See the [`M1` branch](../../tree/M1) and [`docs/M1-PORT.md`](docs/M1-PORT.md) for build instructions, architecture details, and hardware adaptation notes.
 
 ---
 
@@ -57,6 +60,9 @@ CLAWHunter/
 │   │   └── payload.sh                ← Recon variant (RF-first, auto-connect)
 │   └── alert/clawhunter-watchdog/
 │       └── payload.sh                ← Alert variant (auto-fires, <5s, silent)
+├── vendor/                           ← [M1 branch only] Vendored M1 firmware + SDK
+│   ├── M1/                           ← Monstatek M1 firmware (with CLAWHunter integrated)
+│   └── m1-sdk/                       ← M1 external app SDK
 ├── CHANGELOG.md                      ← Full version history with dates
 └── CONTRIBUTING.md                   ← Contribution guidelines and compatibility rules
 ```
