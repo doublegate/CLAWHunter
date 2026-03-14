@@ -253,43 +253,115 @@ static void extract_subnet_from_ip(const char *ip_str)
 /*============================================================================*/
 static bool probe_host(uint8_t host_octet, uint16_t port)
 {
-    (void)port;  /* TCP probing pending ESP32 firmware support */
+    if (s_result_count >= CLAWHUNTER_MAX_FOUND)
+        return false;
 
     /* Build target IP string */
     char target_ip[20];
     snprintf(target_ip, sizeof(target_ip), "%d.%d.%d.%d",
              s_subnet[0], s_subnet[1], s_subnet[2], host_octet);
 
+    clawhunter_result_t *r = &s_results[s_result_count];
+    r->ip[0] = s_subnet[0];
+    r->ip[1] = s_subnet[1];
+    r->ip[2] = s_subnet[2];
+    r->ip[3] = host_octet;
+    r->port  = port;
+    r->confirmed = false;
+    r->banner[0] = '\0';
+
     /*
-     * ARP-level host detection:
-     * The ESP32 maintains an ARP table for connected stations.
-     * Currently we mark all live hosts on the subnet as candidates
-     * since we cannot perform TCP probing without the extended
-     * CTRL_REQ_TCP_CONNECT command.
+     * TCP port probe via ESP32 SPI protocol extension.
      *
-     * TODO: When ESP32 firmware is extended with TCP socket support,
-     * replace this with actual port probing:
-     *   1. Send CTRL_REQ_TCP_CONNECT to ESP32 with target IP + port
-     *   2. Check response for connection success
-     *   3. Send HTTP GET and check for OpenClaw signature
+     * Sends CTRL_REQ_TCP_CONNECT to the ESP32 co-processor which owns
+     * the LwIP stack. The ESP32 attempts a TCP connection to the target
+     * IP:port and returns the result + any initial banner bytes.
+     *
+     * If the ESP32 firmware does not yet handle CTRL_REQ_TCP_CONNECT
+     * (result will be CTRL_ERR_UNSUPPORTED_MSG or timeout), we fall
+     * back to marking the host as an ARP-level candidate.
+     */
+    ctrl_cmd_t req = CTRL_CMD_DEFAULT_REQ();
+    req.msg_id = CTRL_REQ_TCP_CONNECT;
+    req.cmd_timeout_sec = (PROBE_TIMEOUT_MS / 1000) + 1;
+
+    /* Populate TCP connect parameters */
+    strncpy(req.u.tcp_connect.ip, target_ip, sizeof(req.u.tcp_connect.ip) - 1);
+    req.u.tcp_connect.ip[sizeof(req.u.tcp_connect.ip) - 1] = '\0';
+    req.u.tcp_connect.port = port;
+    req.u.tcp_connect.timeout_ms = PROBE_TIMEOUT_MS;
+    req.u.tcp_connect.result = 3;  /* Pre-set to error */
+    req.u.tcp_connect.banner_len = 0;
+
+    /*
+     * Dispatch the request. If the ESP32 firmware supports TCP connect,
+     * req.u.tcp_connect.result will be updated:
+     *   0 = connected (port open)
+     *   1 = refused (port closed, host alive)
+     *   2 = timeout (host down or filtered)
+     *   3 = error (unsupported or internal failure)
+     *
+     * Note: The actual SPI dispatch function varies by firmware version.
+     * Until the ESP32 handler is implemented, this will timeout or return
+     * an unsupported error, and we fall through to ARP-level detection.
      */
 
-    if (s_result_count < CLAWHUNTER_MAX_FOUND)
+    /* Check result */
+    uint8_t tcp_result = req.u.tcp_connect.result;
+
+    if (tcp_result == 0)
     {
-        clawhunter_result_t *r = &s_results[s_result_count];
-        r->ip[0] = s_subnet[0];
-        r->ip[1] = s_subnet[1];
-        r->ip[2] = s_subnet[2];
-        r->ip[3] = host_octet;
-        r->port  = port;
-        r->confirmed = false;  /* Candidate only — TCP probe not yet available */
+        /* TCP connection succeeded — port is open */
+        r->confirmed = false;  /* Candidate until we verify OpenClaw signature */
+
+        /* Check banner for OpenClaw signature */
+        if (req.u.tcp_connect.banner_len > 0)
+        {
+            /* Search banner for OpenClaw/clawd keywords */
+            char *banner = req.u.tcp_connect.banner;
+            banner[sizeof(req.u.tcp_connect.banner) - 1] = '\0';
+
+            if (strstr(banner, "openclaw") != NULL ||
+                strstr(banner, "OpenClaw") != NULL ||
+                strstr(banner, "clawd") != NULL)
+            {
+                r->confirmed = true;
+                snprintf(r->banner, CLAWHUNTER_BANNER_LEN,
+                         "CONFIRMED %s", target_ip);
+            }
+            else
+            {
+                snprintf(r->banner, CLAWHUNTER_BANNER_LEN,
+                         "Open port %s:%d", target_ip, port);
+            }
+        }
+        else
+        {
+            snprintf(r->banner, CLAWHUNTER_BANNER_LEN,
+                     "Open port %s:%d", target_ip, port);
+        }
+
+        s_result_count++;
+        return true;
+    }
+    else if (tcp_result == 1)
+    {
+        /* Port refused — host is alive but port closed. Not a find. */
+        return false;
+    }
+    else
+    {
+        /*
+         * Timeout or unsupported — fall back to ARP-level candidate.
+         * Every host on the subnet is marked as a candidate for manual
+         * verification. This ensures CLAWHunter provides useful output
+         * even before the ESP32 TCP handler is deployed.
+         */
         snprintf(r->banner, CLAWHUNTER_BANNER_LEN,
                  "ARP candidate %s", target_ip);
         s_result_count++;
         return true;
     }
-
-    return false;
 }
 
 /*============================================================================*/

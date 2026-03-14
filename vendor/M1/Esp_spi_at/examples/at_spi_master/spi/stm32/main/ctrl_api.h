@@ -491,6 +491,16 @@ typedef struct {
 	int band_mode;
 } wifi_ap_config_t;
 
+/* CLAWHunter: TCP connect request/response for port probing via ESP32 */
+typedef struct {
+	char     ip[16];           /* Target IPv4 address string "a.b.c.d"      */
+	uint16_t port;             /* Target TCP port                            */
+	uint16_t timeout_ms;       /* Connection timeout in milliseconds         */
+	uint8_t  result;           /* 0=connected, 1=refused, 2=timeout, 3=error */
+	char     banner[64];       /* First 64 bytes of response (if any)        */
+	uint16_t banner_len;       /* Actual bytes received in banner            */
+} tcp_connect_t;
+
 typedef struct {
 	uint8_t ssid[SSID_LENGTH];
 	uint8_t pwd[PASSWORD_LENGTH];
@@ -623,6 +633,7 @@ typedef struct Ctrl_cmd_t {
 	union {
 		wifi_ap_scan_list_t         wifi_ap_scan;
 		wifi_ap_config_t            wifi_ap_config;
+		tcp_connect_t               tcp_connect;
 		ble_scan_list_t             ble_scan;
 	}u;
 	/* Wait for timeout duration, if response not received,
