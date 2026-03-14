@@ -1,0 +1,1188 @@
+�   .cproject
+�   .mxproject
+�   .project
+�   ARCHITECTURE.md
+�   CHANGELOG.md
+�   CMakeLists.txt
+�   CMakePresets.json
+�   COPYING.txt
+�   DEVELOPMENT.md
+�   HARDWARE.md
+�   LICENSE
+�   MonstaTek_M1_v0800 Debug.launch
+�   MonstaTek_M1_v0800 Release.launch
+�   MonstaTek_M1_v0800.ioc
+�   Project_files.txt
+�   README.md
+�   README_License.md
+�   STM32H573VITX_FLASH.ld
+�   STM32H573VITX_RAM.ld
+�   
+����.settings
+�       com.st.stm32cube.ide.mcu.sfrview.prefs
+�       language.settings.xml
+�       org.eclipse.cdt.core.prefs
+�       stm32cubeide.project.prefs
+�       
+����.vscode
+�       c_cpp_properties.json
+�       launch.json
+�       settings.json
+�       tasks.json
+�       
+����Battery
+�       battery.c
+�       battery.h
+�       
+����build
+����cmake
+�   �   gcc-arm-none-eabi.cmake
+�   �   
+�   ����m1_01
+�           CMakeLists.txt
+�           
+����CMakeFiles
+�   �   cmake.check_cache
+�   �   CMakeConfigureLog.yaml
+�   �   
+�   ����4.0.2
+�   �       CMakeSystem.cmake
+�   �       VCTargetsPath.vcxproj
+�   �       
+�   ����pkgRedirects
+����Core
+�   ����Inc
+�   �       app_freertos.h
+�   �       cli_app.h
+�   �       FreeRTOSConfig.h
+�   �       FreeRTOS_CLI.h
+�   �       main.h
+�   �       stm32h5xx_hal_conf.h
+�   �       stm32h5xx_it.h
+�   �       
+�   ����Src
+�   �       app_freertos.c
+�   �       cli_app.c
+�   �       FreeRTOS_CLI.c
+�   �       main.c
+�   �       stm32h5xx_hal_msp.c
+�   �       stm32h5xx_hal_timebase_tim.c
+�   �       stm32h5xx_it.c
+�   �       syscalls.c
+�   �       sysmem.c
+�   �       system_stm32h5xx.c
+�   �       
+�   ����Startup
+�   �       startup_stm32h573vitx.s
+�   �       
+�   ����ThreadSafe
+�           newlib_lock_glue.c
+�           stm32_lock.h
+�           
+����Debug
+�       makefile
+�       MonstaTek_M1_v0800.bin
+�       MonstaTek_M1_v0800.elf
+�       MonstaTek_M1_v0800.hex
+�       objects.list
+�       objects.mk
+�       sources.mk
+�       
+����documentation
+�       mbt.md
+�       
+����Drivers
+�   ����BSP
+�   �   ����Components
+�   �       ����ST25R3916
+�   �               LICENSE.txt
+�   �               Release_Notes.html
+�   �               rfal_analogConfigTbl.h
+�   �               rfal_dpoTbl.h
+�   �               rfal_features.h
+�   �               rfal_rfst25r3916.c
+�   �               st25r3916.c
+�   �               st25r3916.h
+�   �               st25r3916_aat.c
+�   �               st25r3916_aat.h
+�   �               st25r3916_com.c
+�   �               st25r3916_com.h
+�   �               st25r3916_irq.c
+�   �               st25r3916_irq.h
+�   �               st25r3916_led.c
+�   �               st25r3916_led.h
+�   �               st_errno.h
+�   �               timer.c
+�   �               timer.h
+�   �               utils.h
+�   �               
+�   ����CMSIS
+�   �   �   LICENSE.txt
+�   �   �   
+�   �   ����Device
+�   �   �   ����ST
+�   �   �       ����STM32H5xx
+�   �   �           �   LICENSE.md
+�   �   �           �   LICENSE.txt
+�   �   �           �   
+�   �   �           ����Include
+�   �   �           �       stm32h573xx.h
+�   �   �           �       stm32h5xx.h
+�   �   �           �       system_stm32h5xx.h
+�   �   �           �       
+�   �   �           ����Source
+�   �   �               ����Templates
+�   �   ����Include
+�   �           cachel1_armv7.h
+�   �           cmsis_armcc.h
+�   �           cmsis_armclang.h
+�   �           cmsis_armclang_ltm.h
+�   �           cmsis_compiler.h
+�   �           cmsis_gcc.h
+�   �           cmsis_iccarm.h
+�   �           cmsis_version.h
+�   �           core_armv81mml.h
+�   �           core_armv8mbl.h
+�   �           core_armv8mml.h
+�   �           core_cm0.h
+�   �           core_cm0plus.h
+�   �           core_cm1.h
+�   �           core_cm23.h
+�   �           core_cm3.h
+�   �           core_cm33.h
+�   �           core_cm35p.h
+�   �           core_cm4.h
+�   �           core_cm55.h
+�   �           core_cm7.h
+�   �           core_cm85.h
+�   �           core_sc000.h
+�   �           core_sc300.h
+�   �           core_starmc1.h
+�   �           mpu_armv7.h
+�   �           mpu_armv8.h
+�   �           pac_armv81.h
+�   �           pmu_armv8.h
+�   �           tz_context.h
+�   �           
+�   ����STM32H5xx_HAL_Driver
+�   �   �   LICENSE.md
+�   �   �   LICENSE.txt
+�   �   �   
+�   �   ����Inc
+�   �   �   �   stm32h5xx_hal.h
+�   �   �   �   stm32h5xx_hal_cortex.h
+�   �   �   �   stm32h5xx_hal_crc.h
+�   �   �   �   stm32h5xx_hal_crc_ex.h
+�   �   �   �   stm32h5xx_hal_def.h
+�   �   �   �   stm32h5xx_hal_dma.h
+�   �   �   �   stm32h5xx_hal_dma_ex.h
+�   �   �   �   stm32h5xx_hal_exti.h
+�   �   �   �   stm32h5xx_hal_flash.h
+�   �   �   �   stm32h5xx_hal_flash_ex.h
+�   �   �   �   stm32h5xx_hal_gpio.h
+�   �   �   �   stm32h5xx_hal_gpio_ex.h
+�   �   �   �   stm32h5xx_hal_hcd.h
+�   �   �   �   stm32h5xx_hal_i2c.h
+�   �   �   �   stm32h5xx_hal_i2c_ex.h
+�   �   �   �   stm32h5xx_hal_icache.h
+�   �   �   �   stm32h5xx_hal_iwdg.h
+�   �   �   �   stm32h5xx_hal_pcd.h
+�   �   �   �   stm32h5xx_hal_pcd_ex.h
+�   �   �   �   stm32h5xx_hal_pwr.h
+�   �   �   �   stm32h5xx_hal_pwr_ex.h
+�   �   �   �   stm32h5xx_hal_rcc.h
+�   �   �   �   stm32h5xx_hal_rcc_ex.h
+�   �   �   �   stm32h5xx_hal_rtc.h
+�   �   �   �   stm32h5xx_hal_rtc_ex.h
+�   �   �   �   stm32h5xx_hal_sd.h
+�   �   �   �   stm32h5xx_hal_sd_ex.h
+�   �   �   �   stm32h5xx_hal_spi.h
+�   �   �   �   stm32h5xx_hal_spi_ex.h
+�   �   �   �   stm32h5xx_hal_tim.h
+�   �   �   �   stm32h5xx_hal_tim_ex.h
+�   �   �   �   stm32h5xx_hal_uart.h
+�   �   �   �   stm32h5xx_hal_uart_ex.h
+�   �   �   �   stm32h5xx_ll_bus.h
+�   �   �   �   stm32h5xx_ll_cortex.h
+�   �   �   �   stm32h5xx_ll_crc.h
+�   �   �   �   stm32h5xx_ll_crs.h
+�   �   �   �   stm32h5xx_ll_dlyb.h
+�   �   �   �   stm32h5xx_ll_dma.h
+�   �   �   �   stm32h5xx_ll_exti.h
+�   �   �   �   stm32h5xx_ll_gpio.h
+�   �   �   �   stm32h5xx_ll_i2c.h
+�   �   �   �   stm32h5xx_ll_icache.h
+�   �   �   �   stm32h5xx_ll_iwdg.h
+�   �   �   �   stm32h5xx_ll_lpuart.h
+�   �   �   �   stm32h5xx_ll_pwr.h
+�   �   �   �   stm32h5xx_ll_rcc.h
+�   �   �   �   stm32h5xx_ll_rtc.h
+�   �   �   �   stm32h5xx_ll_sdmmc.h
+�   �   �   �   stm32h5xx_ll_spi.h
+�   �   �   �   stm32h5xx_ll_system.h
+�   �   �   �   stm32h5xx_ll_usart.h
+�   �   �   �   stm32h5xx_ll_usb.h
+�   �   �   �   stm32h5xx_ll_utils.h
+�   �   �   �   
+�   �   �   ����Legacy
+�   �   �           stm32_hal_legacy.h
+�   �   �           
+�   �   ����Src
+�   �           stm32h5xx_hal.c
+�   �           stm32h5xx_hal_cortex.c
+�   �           stm32h5xx_hal_crc.c
+�   �           stm32h5xx_hal_crc_ex.c
+�   �           stm32h5xx_hal_dma.c
+�   �           stm32h5xx_hal_dma_ex.c
+�   �           stm32h5xx_hal_exti.c
+�   �           stm32h5xx_hal_flash.c
+�   �           stm32h5xx_hal_flash_ex.c
+�   �           stm32h5xx_hal_gpio.c
+�   �           stm32h5xx_hal_hcd.c
+�   �           stm32h5xx_hal_i2c.c
+�   �           stm32h5xx_hal_i2c_ex.c
+�   �           stm32h5xx_hal_icache.c
+�   �           stm32h5xx_hal_iwdg.c
+�   �           stm32h5xx_hal_pcd.c
+�   �           stm32h5xx_hal_pcd_ex.c
+�   �           stm32h5xx_hal_pwr.c
+�   �           stm32h5xx_hal_pwr_ex.c
+�   �           stm32h5xx_hal_rcc.c
+�   �           stm32h5xx_hal_rcc_ex.c
+�   �           stm32h5xx_hal_rtc.c
+�   �           stm32h5xx_hal_rtc_ex.c
+�   �           stm32h5xx_hal_sd.c
+�   �           stm32h5xx_hal_sd_ex.c
+�   �           stm32h5xx_hal_spi.c
+�   �           stm32h5xx_hal_spi_ex.c
+�   �           stm32h5xx_hal_tim.c
+�   �           stm32h5xx_hal_tim_ex.c
+�   �           stm32h5xx_hal_uart.c
+�   �           stm32h5xx_hal_uart_ex.c
+�   �           stm32h5xx_ll_dlyb.c
+�   �           stm32h5xx_ll_sdmmc.c
+�   �           stm32h5xx_ll_usb.c
+�   �           
+�   ����u8g2_cppsrc
+�   �       MUIU8g2.h
+�   �       U8g2lib.cpp
+�   �       U8g2lib.h
+�   �       U8x8lib.cpp
+�   �       U8x8lib.h
+�   �       
+�   ����u8g2_csrc
+�           mui.c
+�           mui.h
+�           mui_u8g2.c
+�           mui_u8g2.h
+�           u8g2.h
+�           u8g2_arc.c
+�           u8g2_bitmap.c
+�           u8g2_box.c
+�           u8g2_buffer.c
+�           u8g2_button.c
+�           u8g2_circle.c
+�           u8g2_cleardisplay.c
+�           u8g2_d_memory.c
+�           u8g2_d_setup.c
+�           u8g2_font.c
+�           u8g2_fonts.c
+�           u8g2_hvline.c
+�           u8g2_input_value.c
+�           u8g2_intersection.c
+�           u8g2_kerning.c
+�           u8g2_line.c
+�           u8g2_ll_hvline.c
+�           u8g2_message.c
+�           u8g2_polygon.c
+�           u8g2_selection_list.c
+�           u8g2_setup.c
+�           u8log.c
+�           u8log_u8g2.c
+�           u8log_u8x8.c
+�           u8x8.h
+�           u8x8_8x8.c
+�           u8x8_byte.c
+�           u8x8_cad.c
+�           u8x8_capture.c
+�           u8x8_debounce.c
+�           u8x8_display.c
+�           u8x8_d_a2printer.c
+�           u8x8_d_ch1120.c
+�           u8x8_d_gp1247ai.c
+�           u8x8_d_gp1287ai.c
+�           u8x8_d_gp1294ai.c
+�           u8x8_d_gu800.c
+�           u8x8_d_hd44102.c
+�           u8x8_d_il3820_296x128.c
+�           u8x8_d_ist3020.c
+�           u8x8_d_ist3088.c
+�           u8x8_d_ist7920.c
+�           u8x8_d_ks0108.c
+�           u8x8_d_lc7981.c
+�           u8x8_d_ld7032_60x32.c
+�           u8x8_d_ls013b7dh03.c
+�           u8x8_d_max7219.c
+�           u8x8_d_pcd8544_84x48.c
+�           u8x8_d_pcf8812.c
+�           u8x8_d_pcf8814_hx1230.c
+�           u8x8_d_s1d15300.c
+�           u8x8_d_s1d15721.c
+�           u8x8_d_s1d15e06.c
+�           u8x8_d_sbn1661.c
+�           u8x8_d_sed1330.c
+�           u8x8_d_sh1106_64x32.c
+�           u8x8_d_sh1106_72x40.c
+�           u8x8_d_sh1107.c
+�           u8x8_d_sh1108.c
+�           u8x8_d_sh1122.c
+�           u8x8_d_ssd1305.c
+�           u8x8_d_ssd1306_128x32.c
+�           u8x8_d_ssd1306_128x64_noname.c
+�           u8x8_d_ssd1306_2040x16.c
+�           u8x8_d_ssd1306_48x64.c
+�           u8x8_d_ssd1306_64x32.c
+�           u8x8_d_ssd1306_64x48.c
+�           u8x8_d_ssd1306_72x40.c
+�           u8x8_d_ssd1306_96x16.c
+�           u8x8_d_ssd1306_96x40.c
+�           u8x8_d_ssd1309.c
+�           u8x8_d_ssd1312.c
+�           u8x8_d_ssd1316.c
+�           u8x8_d_ssd1317.c
+�           u8x8_d_ssd1318.c
+�           u8x8_d_ssd1320.c
+�           u8x8_d_ssd1322.c
+�           u8x8_d_ssd1325.c
+�           u8x8_d_ssd1326.c
+�           u8x8_d_ssd1327.c
+�           u8x8_d_ssd1329.c
+�           u8x8_d_ssd1362.c
+�           u8x8_d_ssd1363.c
+�           u8x8_d_ssd1606_172x72.c
+�           u8x8_d_ssd1607_200x200.c
+�           u8x8_d_st7302.c
+�           u8x8_d_st7511.c
+�           u8x8_d_st75160.c
+�           u8x8_d_st75161.c
+�           u8x8_d_st75256.c
+�           u8x8_d_st7528.c
+�           u8x8_d_st75320.c
+�           u8x8_d_st7539.c
+�           u8x8_d_st7565.c
+�           u8x8_d_st7567.c
+�           u8x8_d_st7571.c
+�           u8x8_d_st7586s_erc240160.c
+�           u8x8_d_st7586s_jlx320160.c
+�           u8x8_d_st7586s_jlx384160.c
+�           u8x8_d_st7586s_md240128.c
+�           u8x8_d_st7586s_s028hn118a.c
+�           u8x8_d_st7586s_ymc240160.c
+�           u8x8_d_st7588.c
+�           u8x8_d_st7920.c
+�           u8x8_d_stdio.c
+�           u8x8_d_t6963.c
+�           u8x8_d_uc1601.c
+�           u8x8_d_uc1604.c
+�           u8x8_d_uc1608.c
+�           u8x8_d_uc1609.c
+�           u8x8_d_uc1610.c
+�           u8x8_d_uc1611.c
+�           u8x8_d_uc1617.c
+�           u8x8_d_uc1628.c
+�           u8x8_d_uc1638.c
+�           u8x8_d_uc1701_dogs102.c
+�           u8x8_d_uc1701_mini12864.c
+�           u8x8_fonts.c
+�           u8x8_gpio.c
+�           u8x8_input_value.c
+�           u8x8_message.c
+�           u8x8_selection_list.c
+�           u8x8_setup.c
+�           u8x8_string.c
+�           u8x8_u16toa.c
+�           u8x8_u8toa.c
+�           
+����Esp32_serial_flasher
+�   ����app
+�   �   ����binaries
+�   �   �   ����Hello-world
+�   �   �       ����ESP32
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_C2
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_C3
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_C5
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_C6
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_H2
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_P4
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_S2
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP32_S3
+�   �   �       �       bootloader.bin
+�   �   �       �       hello_world.bin
+�   �   �       �       partition-table.bin
+�   �   �       �       
+�   �   �       ����ESP8266
+�   �   �               bootloader.bin
+�   �   �               hello-world.bin
+�   �   �               partition-table.bin
+�   �   �               
+�   �   ����common
+�   �   �       app_common.c
+�   �   �       app_common.h
+�   �   �       bin2array.cmake
+�   �   �       
+�   �   ����stm32
+�   �           libc_compat.c
+�   �           README.md
+�   �           
+�   ����include
+�   �       esp_loader.h
+�   �       esp_loader_io.h
+�   �       serial_io.h
+�   �       
+�   ����port
+�   �       stm32_port.c
+�   �       stm32_port.h
+�   �       
+�   ����private_include
+�   �       esp_stubs.h
+�   �       esp_targets.h
+�   �       md5_hash.h
+�   �       protocol.h
+�   �       protocol_prv.h
+�   �       sip.h
+�   �       slip.h
+�   �       
+�   ����src
+�           esp_loader.c
+�           esp_stubs.c
+�           esp_targets.c
+�           md5_hash.c
+�           protocol_serial.c
+�           protocol_uart.c
+�           slip.c
+�           
+����Esp_spi_at
+�   ����build
+�   �   ����include
+�   �           sdkconfig.h
+�   �           
+�   ����esp-idf
+�   �   ����components
+�   �       ����esp_common
+�   �       �   ����include
+�   �       �           esp_attr.h
+�   �       �           esp_bit_defs.h
+�   �       �           esp_check.h
+�   �       �           esp_err.h
+�   �       �           esp_idf_version.h
+�   �       �           
+�   �       ����esp_driver_spi
+�   �       �   ����include
+�   �       �   �   ����driver
+�   �       �   �           spi_master.h
+�   �       �   �           
+�   �       �   ����src
+�   �       �       ����gpspi
+�   �       �               spi_master.c
+�   �       �               
+�   �       ����esp_hw_support
+�   �       �   ����include
+�   �       �           esp_intr_alloc.h
+�   �       �           
+�   �       ����esp_system
+�   �       �   ����include
+�   �       �           esp_system.h
+�   �       �           
+�   �       ����hal
+�   �       �   ����include
+�   �       �       ����hal
+�   �       �               spi_types.h
+�   �       �               
+�   �       ����log
+�   �       �   ����include
+�   �       �       �   esp_log.h
+�   �       �       �   
+�   �       �       ����hal
+�   �       �               spi_hal.h
+�   �       �               
+�   �       ����soc
+�   �           ����esp32c6
+�   �               ����include
+�   �               �   ����soc
+�   �               �           soc_caps.h
+�   �               �           
+�   �               ����register
+�   �                   ����soc
+�   �                           spi_struct.h
+�   �                           
+�   ����examples
+�       ����at_spi_master
+�           ����spi
+�               ����stm32
+�                   ����main
+�                           ctrl_api.h
+�                           esp_app_main.c
+�                           esp_app_main.h
+�                           esp_at_list.h
+�                           esp_queue.c
+�                           esp_queue.h
+�                           m1_at_response_parser.c
+�                           m1_at_response_parser.h
+�                           
+����FatFs
+�   ����R015
+�           00history.txt
+�           00readme.txt
+�           diskio.c
+�           diskio.h
+�           ff.c
+�           ff.h
+�           ffconf.h
+�           ffsystem.c
+�           ffsystem_baremetal.c
+�           ffsystem_cmsis_os.c
+�           ffunicode.c
+�           ff_gen_drv.c
+�           ff_gen_drv.h
+�           st_readme.txt
+�           
+����Infrared
+�   ����irmp-irsnd
+�       �   irmp.c
+�       �   irmp.h
+�       �   irmpconfig.h
+�       �   irmpextlog.c
+�       �   irmpextlog.h
+�       �   irmpprotocols.h
+�       �   irmpsystem.h
+�       �   irsnd.c
+�       �   irsnd.h
+�       �   irsndconfig.h
+�       �   README.txt
+�       �   
+�       ����IR-Data
+�               3xNEC3xAPPLE.log.txt
+�               a1tvbox-15kHz.txt
+�               a1tvbox-20kHz.txt
+�               acp24-15kHz.txt
+�               apple-15kHz.txt
+�               apple-unibody-remote.txt
+�               apple.txt
+�               bose_wave_system_15khz.txt
+�               bo_beolink1000-10kHz.txt
+�               bo_beolink1000-15kHz.txt
+�               Dbox.txt
+�               denon-15kHz.txt
+�               denon-rc-176-15kHz.txt
+�               denon-rc-176-repeat-15kHz.txt
+�               denon.txt
+�               denon1_kurz_10khz.txt
+�               denon3_kurz_10khz.txt
+�               DK_Digital.txt
+�               elta_radio.txt
+�               fdc-20kHz.txt
+�               fdc.txt
+�               fdc2-20kHz.txt
+�               Grundig_TP715.txt
+�               Grundig_TP715_lange.txt
+�               Grundig_TP715_SatTV.txt
+�               Grundig_TP715_Video.txt
+�               irc-15kHz.txt
+�               irmp16-15kHz.txt
+�               irsnd-irmp-test.sh
+�               jvc-nec.txt
+�               jvc-rm-rk250-10kHz.txt
+�               jvc.txt
+�               kaseikyo-15kHz.txt
+�               kathrein-15kHz.txt
+�               Kathrein-UFS-912-Remote.txt
+�               lg-air-15kHz.txt
+�               Matsushita.txt
+�               matsushita1-15kHz
+�               matsushita2-15kHz
+�               melinera-15kHz.txt
+�               melinera-20kHz.txt
+�               merlin-15kHz.txt
+�               merlin2-20kHz.txt
+�               metz-20kHz.txt
+�               nec-non-std-rep.txt
+�               nec-repetition.txt
+�               nec-skymaster-dt500.txt
+�               nec.txt
+�               nikon.txt
+�               Nokia.txt
+�               nubert-subwoofer.txt
+�               onkyo-15kHz.txt
+�               orion_vcr_07660BM070.txt
+�               ortek-hama-10kHz.txt
+�               panasonic-15kHz.txt
+�               Panasonic-Blue-Ray.txt
+�               panasonic-scan.txt
+�               panasonic-vcr-15kHz.txt
+�               panasonic_DVD_N2QAYB000333.txt
+�               pentax-15kHz.txt
+�               rc-car-20kHz.txt
+�               rc-car.txt
+�               rc5-philipps-15kHz.txt
+�               RC5-Taste.txt
+�               rc5.txt
+�               rc5x-79.txt
+�               rc5x.txt
+�               rc6-hold.txt
+�               rc6.txt
+�               rc6a-siemens-15kHz.txt
+�               rcii-15kHz.txt
+�               rcmm-20kHz.txt
+�               recs80-15kHz.txt
+�               rf-pollin-15kz.txt
+�               rf-x10-15kz.txt
+�               roomba-15kHz.txt
+�               s100-56-15kHz.txt
+�               saa3004-15kHz.txt
+�               saa3004-20kHz.txt
+�               samsung-br-15kHz.txt
+�               samsung32-15kHz.txt
+�               samsung32-tv-15kHz.txt
+�               samsung48-15kHz.txt
+�               Samsung_DVD_Rec_00062C.txt
+�               Samsung_TV.txt
+�               sharp-denon.txt
+�               sharp-denon2.txt
+�               sharp_15khz.txt
+�               sharp_kurz_10khz.txt
+�               sharp_lang_10khz.txt
+�               Siemens-Gigaset-M740AV-15kHz.txt
+�               Sony-RM-S-310.txt
+�               sony-rm-s311.txt
+�               Sony-RM-U305C.txt
+�               Sony-RM-X151.txt
+�               Sony-RMT-D142P-DVD.txt
+�               Sony-RMT-V406.txt
+�               sony-television-service-commander.txt
+�               Sony_Bravia_RM-ED0009_new.txt
+�               Sony_RM-S315_lange.txt
+�               speaker-15kHz.txt
+�               t-home-mediareceiver-15kHz.txt
+�               t-home-mediareceiver.txt
+�               technics-15kHz.txt
+�               telefunken-1560-20kHz.txt
+�               test-suite.sh
+�               thomson-mb100-15kHz.txt
+�               tp400vt-15kHz.txt
+�               tua-20kHz.txt
+�               universal-15kHz.txt
+�               ventilator-15kHz.txt
+�               vincent-15kHz.txt
+�               vincent-flash-15kHz.txt
+�               xbox360-10kHz.txt
+�               xbox360-15kHz.txt
+�               Yamaha-RAV388.txt
+�               
+����lfrfid
+�       lfrfid.c
+�       lfrfid.h
+�       lfrfid_file.c
+�       lfrfid_file.h
+�       lfrfid_hal.c
+�       lfrfid_hal.h
+�       lfrfid_protocol.c
+�       lfrfid_protocol.h
+�       lfrfid_protocol_em4100.c
+�       lfrfid_protocol_em4100.h
+�       lfrfid_protocol_h10301.c
+�       lfrfid_protocol_h10301.h
+�       t5577.c
+�       t5577.h
+�       
+����m1_csrc
+�       bit_util.c
+�       bit_util.h
+�       logger.c
+�       logger.h
+�       m1_bq25896.c
+�       m1_bq25896.h
+�       m1_bq27421.c
+�       m1_bq27421.h
+�       m1_bt.c
+�       m1_bt.h
+�       m1_buzzer.c
+�       m1_buzzer.h
+�       m1_cli.c
+�       m1_cli.h
+�       m1_cli_help.c
+�       m1_compile_cfg.h
+�       m1_core_config.c
+�       m1_core_config.h
+�       m1_display.c
+�       m1_display.h
+�       m1_display_data.c
+�       m1_esp32_fw_update.c
+�       m1_esp32_fw_update.h
+�       m1_esp32_hal.c
+�       m1_esp32_hal.h
+�       m1_esp_hosted_config.h
+�       m1_esp_hosted_dummy.c
+�       m1_file_browser.c
+�       m1_file_browser.h
+�       m1_file_util.c
+�       m1_file_util.h
+�       m1_fusb302.c
+�       m1_fusb302.h
+�       m1_fw_update.c
+�       m1_fw_update.h
+�       m1_fw_update_bl.c
+�       m1_fw_update_bl.h
+�       m1_gpio.c
+�       m1_gpio.h
+�       m1_i2c.c
+�       m1_i2c.h
+�       m1_infrared.c
+�       m1_infrared.h
+�       m1_int_hdl.c
+�       m1_int_hdl.h
+�       m1_io_defs.h
+�       m1_lcd.c
+�       m1_lcd.h
+�       m1_led_indicator.c
+�       m1_led_indicator.h
+�       m1_lib.c
+�       m1_lib.h
+�       m1_log_debug.c
+�       m1_log_debug.h
+�       m1_log_debug_defs.h
+�       m1_low_power.c
+�       m1_low_power.h
+�       m1_lp5814.c
+�       m1_lp5814.h
+�       m1_md5_hash.c
+�       m1_md5_hash.h
+�       m1_menu.c
+�       m1_menu.h
+�       m1_nfc.c
+�       m1_nfc.h
+�       m1_power_ctl.c
+�       m1_power_ctl.h
+�       m1_rfid.c
+�       m1_rfid.h
+�       m1_rf_spi.c
+�       m1_rf_spi.h
+�       m1_ring_buffer.c
+�       m1_ring_buffer.h
+�       m1_sdcard.c
+�       m1_sdcard.h
+�       m1_sdcard_man.c
+�       m1_sdcard_man.h
+�       m1_settings.c
+�       m1_settings.h
+�       m1_storage.c
+�       m1_storage.h
+�       m1_sub_ghz.c
+�       m1_sub_ghz.h
+�       m1_system.c
+�       m1_system.h
+�       m1_sys_init.c
+�       m1_sys_init.h
+�       m1_tasks.c
+�       m1_tasks.h
+�       m1_types_def.h
+�       m1_usb_cdc_msc.c
+�       m1_usb_cdc_msc.h
+�       m1_virtual_kb.c
+�       m1_virtual_kb.h
+�       m1_watchdog.c
+�       m1_watchdog.h
+�       m1_wifi.c
+�       m1_wifi.h
+�       privateprofilestring.c
+�       privateprofilestring.h
+�       res_string.c
+�       res_string.h
+�       uiView.c
+�       uiView.h
+�       
+����Middlewares
+�   ����Third_Party
+�       ����CMSIS
+�       �   ����RTOS2
+�       �       ����Include
+�       �               cmsis_os2.h
+�       �               os_tick.h
+�       �               
+�       ����FreeRTOS
+�           �   LICENSE.md
+�           �   
+�           ����Source
+�               �   croutine.c
+�               �   event_groups.c
+�               �   LICENSE
+�               �   list.c
+�               �   queue.c
+�               �   stream_buffer.c
+�               �   tasks.c
+�               �   timers.c
+�               �   
+�               ����CMSIS_RTOS_V2
+�               �       cmsis_os.h
+�               �       cmsis_os2.c
+�               �       freertos_mpool.h
+�               �       freertos_os2.h
+�               �       
+�               ����include
+�               �       atomic.h
+�               �       croutine.h
+�               �       deprecated_definitions.h
+�               �       event_groups.h
+�               �       FreeRTOS.h
+�               �       FreeRTOSConfig_template.h
+�               �       list.h
+�               �       message_buffer.h
+�               �       mpu_prototypes.h
+�               �       mpu_wrappers.h
+�               �       portable.h
+�               �       projdefs.h
+�               �       queue.h
+�               �       semphr.h
+�               �       StackMacros.h
+�               �       stack_macros.h
+�               �       stream_buffer.h
+�               �       task.h
+�               �       timers.h
+�               �       
+�               ����portable
+�                   ����GCC
+�                   �   ����ARM_CM33_NTZ
+�                   �       ����non_secure
+�                   �               port.c
+�                   �               portasm.c
+�                   �               portasm.h
+�                   �               portmacro.h
+�                   �               portmacrocommon.h
+�                   �               
+�                   ����MemMang
+�                           heap_4.c
+�                           
+����NFC
+�   �   app_x-cube-nfcx.c
+�   �   app_x-cube-nfcx.h
+�   �   nfc_conf.h
+�   �   rfal_platform.h
+�   �   RTE_Components.h
+�   �   
+�   ����Middlewares
+�   �   ����ST
+�   �       ����rfal
+�   �           �   LICENSE.txt
+�   �           �   
+�   �           ����Inc
+�   �           �       rfal_analogConfig.h
+�   �           �       rfal_cd.h
+�   �           �       rfal_chip.h
+�   �           �       rfal_defConfig.h
+�   �           �       rfal_dpo.h
+�   �           �       rfal_isoDep.h
+�   �           �       rfal_nfc.h
+�   �           �       rfal_nfca.h
+�   �           �       rfal_nfcb.h
+�   �           �       rfal_nfcDep.h
+�   �           �       rfal_nfcf.h
+�   �           �       rfal_nfcv.h
+�   �           �       rfal_rf.h
+�   �           �       rfal_st25tb.h
+�   �           �       rfal_st25xv.h
+�   �           �       rfal_t1t.h
+�   �           �       rfal_t2t.h
+�   �           �       rfal_t4t.h
+�   �           �       rfal_utils.h
+�   �           �       
+�   �           ����Src
+�   �                   rfal_analogConfig.c
+�   �                   rfal_cd.c
+�   �                   rfal_crc.c
+�   �                   rfal_crc.h
+�   �                   rfal_dpo.c
+�   �                   rfal_iso15693_2.c
+�   �                   rfal_iso15693_2.h
+�   �                   rfal_isoDep.c
+�   �                   rfal_nfc.c
+�   �                   rfal_nfca.c
+�   �                   rfal_nfcb.c
+�   �                   rfal_nfcDep.c
+�   �                   rfal_nfcf.c
+�   �                   rfal_nfcv.c
+�   �                   rfal_st25tb.c
+�   �                   rfal_st25xv.c
+�   �                   rfal_t1t.c
+�   �                   rfal_t2t.c
+�   �                   rfal_t4t.c
+�   �                   
+�   ����NFC_drv
+�       ����common
+�       �       nfc_ctx.c
+�       �       nfc_ctx.h
+�       �       nfc_file.c
+�       �       nfc_file.h
+�       �       nfc_fileio.c
+�       �       nfc_fileio.h
+�       �       nfc_file_form.txt
+�       �       nfc_storage.c
+�       �       nfc_storage.h
+�       �       
+�       ����legacy
+�               nfc_driver.c
+�               nfc_driver.h
+�               nfc_listener.c
+�               nfc_listener.h
+�               nfc_poller.c
+�               nfc_poller.h
+�               
+����out
+�   ����build
+�       ����gcc-14_2_build-debug
+�       �   �   .ninja_deps
+�       �   �   .ninja_log
+�       �   �   build.ninja
+�       �   �   CMakeCache.txt
+�       �   �   cmake_install.cmake
+�       �   �   compile_commands.json
+�       �   �   MonstaTek_M1_v0800.bin
+�       �   �   MonstaTek_M1_v0800.elf
+�       �   �   MonstaTek_M1_v0800.hex
+�       �   �   MonstaTek_M1_v0800_wCRC.bin
+�       �   �   
+�       �   ����.cmake
+�       �   �   ����api
+�       �   �       ����v1
+�       �   �           ����query
+�       �   �           �   ����client-vscode
+�       �   �           �           query.json
+�       �   �           �           
+�       �   �           ����reply
+�       �   �                   cache-v2-68a22b2e59bd6e10a67a.json
+�       �   �                   cmakeFiles-v1-be91366133d2e6da4778.json
+�       �   �                   codemodel-v2-bce11056e965ba9fc554.json
+�       �   �                   directory-.-Debug-d0094a50bb2071803777.json
+�       �   �                   directory-cmake.m1_01-Debug-c92f5447119936ef7780.json
+�       �   �                   index-2026-02-19T23-37-05-0179.json
+�       �   �                   target-MonstaTek_M1_v0800-Debug-d39e320e28295787fc33.json
+�       �   �                   toolchains-v1-228fa0768748194f9d27.json
+�       �   �                   
+�       �   ����cmake
+�       �   �   ����m1_01
+�       �   �       �   cmake_install.cmake
+�       �   �       �   
+�       �   �       ����CMakeFiles
+�       �   ����CMakeFiles
+�       �       �   cmake.check_cache
+�       �       �   CMakeConfigureLog.yaml
+�       �       �   InstallScripts.json
+�       �       �   rules.ninja
+�       �       �   TargetDirectories.txt
+�       �       �   
+�       �       ����4.0.2
+�       �       �   �   CMakeASMCompiler.cmake
+�       �       �   �   CMakeCCompiler.cmake
+�       �       �   �   CMakeCXXCompiler.cmake
+�       �       �   �   CMakeSystem.cmake
+�       �       �   �   
+�       �       �   ����CompilerIdASM
+�       �       �   ����CompilerIdC
+�       �       �   �   �   CMakeCCompilerId.c
+�       �       �   �   �   CMakeCCompilerId.o
+�       �       �   �   �   
+�       �       �   �   ����tmp
+�       �       �   ����CompilerIdCXX
+�       �       �       �   CMakeCXXCompilerId.cpp
+�       �       �       �   CMakeCXXCompilerId.o
+�       �       �       �   
+�       �       �       ����tmp
+�       �       ����pkgRedirects
+�       ����gcc-14_2_build-release
+�           �   .ninja_deps
+�           �   .ninja_log
+�           �   build.ninja
+�           �   CMakeCache.txt
+�           �   cmake_install.cmake
+�           �   compile_commands.json
+�           �   MonstaTek_M1_v0800.bin
+�           �   MonstaTek_M1_v0800.elf
+�           �   MonstaTek_M1_v0800.hex
+�           �   MonstaTek_M1_v0800.list
+�           �   MonstaTek_M1_v0800.map
+�           �   MonstaTek_M1_v0800_wCRC.bin
+�           �   
+�           ����.cmake
+�           �   ����api
+�           �       ����v1
+�           �           ����query
+�           �           �   ����client-vscode
+�           �           �           query.json
+�           �           �           
+�           �           ����reply
+�           �                   cache-v2-3480e525d0b5f794c76a.json
+�           �                   cmakeFiles-v1-ca3dd17a0191376e8d94.json
+�           �                   codemodel-v2-066cc252973be73ca18d.json
+�           �                   directory-.-Release-d0094a50bb2071803777.json
+�           �                   directory-cmake.m1_01-Release-c92f5447119936ef7780.json
+�           �                   index-2026-02-19T23-36-45-0150.json
+�           �                   target-MonstaTek_M1_v0800-Release-324e9b2f34e985cadfea.json
+�           �                   toolchains-v1-228fa0768748194f9d27.json
+�           �                   
+�           ����cmake
+�           �   ����m1_01
+�           �       �   cmake_install.cmake
+�           �       �   
+�           �       ����CMakeFiles
+�           ����CMakeFiles
+�               �   cmake.check_cache
+�               �   CMakeConfigureLog.yaml
+�               �   InstallScripts.json
+�               �   rules.ninja
+�               �   TargetDirectories.txt
+�               �   
+�               ����4.0.2
+�               �   �   CMakeASMCompiler.cmake
+�               �   �   CMakeCCompiler.cmake
+�               �   �   CMakeCXXCompiler.cmake
+�               �   �   CMakeSystem.cmake
+�               �   �   
+�               �   ����CompilerIdASM
+�               �   ����CompilerIdC
+�               �   �   �   CMakeCCompilerId.c
+�               �   �   �   CMakeCCompilerId.o
+�               �   �   �   
+�               �   �   ����tmp
+�               �   ����CompilerIdCXX
+�               �       �   CMakeCXXCompilerId.cpp
+�               �       �   CMakeCXXCompilerId.o
+�               �       �   
+�               �       ����tmp
+�               ����pkgRedirects
+����Release
+�       makefile
+�       MonstaTek_M1_v0800.bin
+�       MonstaTek_M1_v0800.elf
+�       MonstaTek_M1_v0800.hex
+�       MonstaTek_M1_v0800.list
+�       MonstaTek_M1_v0800.map
+�       MonstaTek_M1_v0800_wCRC.bin
+�       objects.list
+�       objects.mk
+�       sources.mk
+�       
+����scripts
+�   �   add_gpl_license_ref.py
+�   �   program.jlink
+�   �   
+�   ����debug
+�           STM32H573.svd
+�           
+����Sub_Ghz
+�   �   datatypes_utils.c
+�   �   datatypes_utils.h
+�   �   m1_sub_ghz_api.c
+�   �   m1_sub_ghz_api.h
+�   �   m1_sub_ghz_decenc.c
+�   �   m1_sub_ghz_decenc.h
+�   �   m1_sub_ghz_si4463_patch.h
+�   �   si446x_cmd.h
+�   �   
+�   ����protocols
+�   �       m1_princeton_decode.c
+�   �       m1_secplus_v2_decode.c
+�   �       
+�   ����radio_config
+�           m1_sub_ghz_915_rxtx_spc25_bwauto_baud106_dev200_e1_10_fsk.h
+�           m1_sub_ghz_xxx_tx_test.h
+�           si4463_revc2_300_rxtx_spacing250_bw200_baud10_error1_10_OOK.h
+�           si4463_revc2_310_rxtx_spacing250_bw100_baud10_error1_10_OOK.h
+�           si4463_revc2_315_rxtx_spacing250_bw100_baud10_error1_10_OOK.h
+�           si4463_revc2_345_rxtx_spacing250_bw100_baud10_error1_10_OOK.h
+�           si4463_revc2_372_rxtx_spacing250_bw200_baud10_error1_10_OOK.h
+�           si4463_revc2_390_rxtx_spacing250_bw100_baud10_error1_10_OOK.h
+�           si4463_revc2_433_92_rxtx_spacing250_bw100_baud10_error1_10_OOK.h
+�           si4463_revc2_433_rxtx_spacing250_bw200_baud10_error1_10_OOK.h
+�           si4463_revc2_915_00_rxtx_spacing25_bw10_baud4_8_error1_10_OOK.h
+�           si4463_revc2_915_rxtx_spacing250_bw200_baud10_error1_10_OOK.h
+�           si4463_revc2_patch.h
+�           
+����USB
+    ����Class
+    �   ����CDC
+    �   �   ����Inc
+    �   �   �       usbd_cdc.h
+    �   �   �       usbd_cdc_if.h
+    �   �   �       
+    �   �   ����Src
+    �   �           usbd_cdc.c
+    �   �           usbd_cdc_if.c
+    �   �           
+    �   ����CompositeBuilder
+    �   �   ����Inc
+    �   �   �       usbd_composite_builder.h
+    �   �   �       
+    �   �   ����Src
+    �   �           usbd_composite_builder.c
+    �   �           
+    �   ����MSC
+    �       ����Inc
+    �       �       usbd_msc.h
+    �       �       usbd_msc_bot.h
+    �       �       usbd_msc_data.h
+    �       �       usbd_msc_scsi.h
+    �       �       usbd_msc_storage.h
+    �       �       
+    �       ����Src
+    �               usbd_msc.c
+    �               usbd_msc_bot.c
+    �               usbd_msc_data.c
+    �               usbd_msc_scsi.c
+    �               usbd_msc_storage.c
+    �               
+    ����Core
+        ����Inc
+        �       usbd_conf.h
+        �       usbd_core.h
+        �       usbd_ctlreq.h
+        �       usbd_def.h
+        �       usbd_desc.h
+        �       usbd_ioreq.h
+        �       
+        ����Src
+                usbd_conf.c
+                usbd_core.c
+                usbd_ctlreq.c
+                usbd_desc.c
+                usbd_ioreq.c
+                
