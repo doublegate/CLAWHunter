@@ -406,12 +406,22 @@ S_M1_Menu_t menu_Wifi_Disconnect =
     "Disconnect", wifi_disconnect, NULL, NULL, 0, 0, NULL, NULL, NULL
 };
 
+S_M1_Menu_t menu_CLAWHunter_Recon = { "Recon", clawhunter_recon, NULL, NULL, 0, 0, NULL, NULL, NULL };
+S_M1_Menu_t menu_CLAWHunter_User = { "User", clawhunter_user, NULL, NULL, 0, 0, NULL, NULL, NULL };
+S_M1_Menu_t menu_CLAWHunter_Alert = { "Alert", clawhunter_alert, NULL, NULL, 0, 0, NULL, NULL, NULL };
+S_M1_Menu_t menu_CLAWHunter = { "CLAWHunter", menu_clawhunter_init, NULL, NULL, 3, 0, NULL, NULL, { &menu_CLAWHunter_Recon, &menu_CLAWHunter_User, &menu_CLAWHunter_Alert } };
+
 S_M1_Menu_t menu_Wifi =
 {
     "Wifi", menu_wifi_init, NULL, NULL, 4, 0, menu_m1_icon_wifi, NULL,
     {&menu_Wifi_Scan_AP, &menu_Wifi_Config, &menu_Wifi_Status, &menu_Wifi_Disconnect}
 };
 #else
+S_M1_Menu_t menu_CLAWHunter_Recon = { "Recon", clawhunter_recon, NULL, NULL, 0, 0, NULL, NULL, NULL };
+S_M1_Menu_t menu_CLAWHunter_User = { "User", clawhunter_user, NULL, NULL, 0, 0, NULL, NULL, NULL };
+S_M1_Menu_t menu_CLAWHunter_Alert = { "Alert", clawhunter_alert, NULL, NULL, 0, 0, NULL, NULL, NULL };
+S_M1_Menu_t menu_CLAWHunter = { "CLAWHunter", menu_clawhunter_init, NULL, NULL, 3, 0, NULL, NULL, { &menu_CLAWHunter_Recon, &menu_CLAWHunter_User, &menu_CLAWHunter_Alert } };
+
 S_M1_Menu_t menu_Wifi =
 {
     "Wifi", menu_wifi_init, NULL, NULL, 2, 0, menu_m1_icon_wifi, NULL,
@@ -528,16 +538,16 @@ const S_M1_Menu_t menu_Main =
 {
 #if defined(M1_APP_BADUSB_ENABLE) && defined(M1_APP_GAMES_ENABLE) && defined(M1_APP_APPS_ENABLE)
     "Main Menu", NULL, NULL, NULL, 11, 0, NULL, NULL,
-    {&menu_Sub_GHz, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_BadUSB, &menu_Games, &menu_Apps, &menu_Settings}
+    {&menu_Sub_GHz, &menu_CLAWHunter, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_BadUSB, &menu_Games, &menu_Apps, &menu_Settings}
 #elif defined(M1_APP_BADUSB_ENABLE)
     "Main Menu", NULL, NULL, NULL, 9, 0, NULL, NULL,
-    {&menu_Sub_GHz, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_BadUSB, &menu_Settings}
+    {&menu_Sub_GHz, &menu_CLAWHunter, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_BadUSB, &menu_Settings}
 #elif defined(M1_APP_GAMES_ENABLE) && defined(M1_APP_APPS_ENABLE)
     "Main Menu", NULL, NULL, NULL, 10, 0, NULL, NULL,
-    {&menu_Sub_GHz, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_Games, &menu_Apps, &menu_Settings}
+    {&menu_Sub_GHz, &menu_CLAWHunter, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_Games, &menu_Apps, &menu_Settings}
 #else
     "Main Menu", NULL, NULL, NULL, 8, 0, NULL, NULL,
-    {&menu_Sub_GHz, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_Settings}
+    {&menu_Sub_GHz, &menu_CLAWHunter, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_Settings}
 #endif
 };
 
