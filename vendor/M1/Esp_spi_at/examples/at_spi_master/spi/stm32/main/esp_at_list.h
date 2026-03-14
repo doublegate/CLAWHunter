@@ -114,3 +114,11 @@
 #define ESP32C6_AT_RES_STAMAC_KEY		"+CIFSR:STAMAC,"
 
 #endif /* ESP32C6_AT_LIST_H_ */
+
+/* CLAWHunter: TCP socket AT commands for port probing */
+#define ESP32C6_AT_REQ_CIPSTART         "AT+CIPSTART="
+#define ESP32C6_AT_REQ_CIPCLOSE         "AT+CIPCLOSE"
+#define ESP32C6_AT_REQ_CIPSEND          "AT+CIPSEND="
+#define ESP32C6_AT_RES_CONNECT          "CONNECT"
+#define ESP32C6_AT_RES_CLOSED           "CLOSED"
+#define ESP32C6_AT_RES_IPD              "+IPD,"

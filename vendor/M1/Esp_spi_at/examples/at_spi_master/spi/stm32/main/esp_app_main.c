@@ -2001,3 +2001,178 @@ uint8_t wifi_get_ip(ctrl_cmd_t *app_req)
 } // uint8_t wifi_get_ip(ctrl_cmd_t *app_req)
 
 #endif /* M1_APP_WIFI_CONNECT_ENABLE */
+
+
+/*============================================================================*/
+/**
+ * @brief  CLAWHunter: TCP connect probe via ESP32 AT+CIPSTART
+ *
+ * Opens a TCP connection to the target IP:port using the ESP32's AT command
+ * interface. If the connection succeeds, reads up to 64 bytes of banner data
+ * (HTTP response or raw TCP banner) for OpenClaw signature detection.
+ *
+ * AT command flow:
+ *   1. AT+CIPSTART="TCP","<ip>",<port>   → CONNECT / ERROR
+ *   2. AT+CIPSEND=<len>                  → send HTTP GET (optional)
+ *   3. Wait for +IPD,<len>:<data>        → read banner
+ *   4. AT+CIPCLOSE                       → close connection
+ *
+ * @param  app_req  ctrl_cmd_t with tcp_connect field populated (ip, port, timeout_ms)
+ * @retval SUCCESS or FAILURE
+ */
+/*============================================================================*/
+uint8_t tcp_connect_probe(ctrl_cmd_t *app_req)
+{
+    char *rx_buf = NULL;
+    char at_cmd_buf[128];
+    int rx_buf_len = 0;
+    uint32_t rx_uid;
+    uint8_t ret;
+
+    /* Default: error */
+    app_req->u.tcp_connect.result = 3;
+    app_req->u.tcp_connect.banner_len = 0;
+    memset(app_req->u.tcp_connect.banner, 0, sizeof(app_req->u.tcp_connect.banner));
+
+    uint16_t timeout_sec = (app_req->u.tcp_connect.timeout_ms / 1000);
+    if (timeout_sec < 2) timeout_sec = 2;
+
+    /* ── Step 1: AT+CIPSTART="TCP","<ip>",<port> ───────────────────────── */
+    snprintf(at_cmd_buf, sizeof(at_cmd_buf),
+             "AT+CIPSTART=\"TCP\",\"%s\",%d\r\n",
+             app_req->u.tcp_connect.ip,
+             app_req->u.tcp_connect.port);
+
+    app_req->at_cmd = strdup(at_cmd_buf);
+    if (app_req->at_cmd == NULL)
+        return FAILURE;
+
+    app_req->cmd_len = strlen(app_req->at_cmd);
+    app_req->cmd_resp = strdup(ESP32C6_AT_RES_OK);
+
+    ret = spi_AT_app_send_command(app_req);
+    if (ret != SUCCESS)
+    {
+        esp_free_mem(&app_req->at_cmd);
+        esp_free_mem(&app_req->cmd_resp);
+        app_req->u.tcp_connect.result = 3;  /* error */
+        return ret;
+    }
+
+    /* Wait for response */
+    rx_buf = (char *)spi_AT_app_get_response(&rx_buf_len, &rx_uid, timeout_sec);
+
+    esp_free_mem(&app_req->at_cmd);
+    esp_free_mem(&app_req->cmd_resp);
+
+    if (rx_buf == NULL || rx_buf_len == 0)
+    {
+        /* Timeout — host down or port filtered */
+        app_req->u.tcp_connect.result = 2;  /* timeout */
+        if (rx_buf) free(rx_buf);
+        return SUCCESS;
+    }
+
+    /* Check for CONNECT (success) or ERROR (refused/failed) */
+    if (strstr(rx_buf, ESP32C6_AT_RES_CONNECT) != NULL ||
+        strstr(rx_buf, "OK") != NULL)
+    {
+        /* TCP connection succeeded — port is open */
+        app_req->u.tcp_connect.result = 0;  /* connected */
+
+        free(rx_buf);
+        rx_buf = NULL;
+
+        /* ── Step 2: Send minimal HTTP GET to elicit banner ─────────── */
+        const char *http_get = "GET / HTTP/1.0\r\nHost: openclaw\r\n\r\n";
+        uint16_t get_len = (uint16_t)strlen(http_get);
+
+        snprintf(at_cmd_buf, sizeof(at_cmd_buf), "AT+CIPSEND=%d\r\n", get_len);
+        app_req->at_cmd = strdup(at_cmd_buf);
+        if (app_req->at_cmd != NULL)
+        {
+            app_req->cmd_len = strlen(app_req->at_cmd);
+            app_req->cmd_resp = strdup(">");
+
+            ret = spi_AT_app_send_command(app_req);
+            esp_free_mem(&app_req->at_cmd);
+            esp_free_mem(&app_req->cmd_resp);
+
+            if (ret == SUCCESS)
+            {
+                /* Wait for '>' prompt, then send the HTTP request body */
+                rx_buf = (char *)spi_AT_app_get_response(&rx_buf_len, &rx_uid, 3);
+                if (rx_buf) free(rx_buf);
+
+                /* Send the actual HTTP GET data */
+                app_req->at_cmd = strdup(http_get);
+                if (app_req->at_cmd != NULL)
+                {
+                    app_req->cmd_len = get_len;
+                    app_req->cmd_resp = strdup("SEND OK");
+                    spi_AT_app_send_command(app_req);
+                    esp_free_mem(&app_req->at_cmd);
+                    esp_free_mem(&app_req->cmd_resp);
+
+                    /* ── Step 3: Read banner from +IPD response ────── */
+                    rx_buf = (char *)spi_AT_app_get_response(&rx_buf_len, &rx_uid, timeout_sec);
+                    if (rx_buf != NULL && rx_buf_len > 0)
+                    {
+                        /* Extract data after +IPD,<len>: prefix */
+                        char *ipd = strstr(rx_buf, "+IPD,");
+                        char *data_start = NULL;
+
+                        if (ipd != NULL)
+                        {
+                            data_start = strchr(ipd, ':');
+                            if (data_start != NULL)
+                                data_start++;  /* skip the ':' */
+                        }
+
+                        if (data_start == NULL)
+                            data_start = rx_buf;  /* fallback: use raw response */
+
+                        /* Copy up to 63 bytes of banner */
+                        uint16_t copy_len = (uint16_t)strlen(data_start);
+                        if (copy_len > sizeof(app_req->u.tcp_connect.banner) - 1)
+                            copy_len = sizeof(app_req->u.tcp_connect.banner) - 1;
+
+                        memcpy(app_req->u.tcp_connect.banner, data_start, copy_len);
+                        app_req->u.tcp_connect.banner[copy_len] = '\0';
+                        app_req->u.tcp_connect.banner_len = copy_len;
+                    }
+                    if (rx_buf) free(rx_buf);
+                }
+            }
+        }
+
+        /* ── Step 4: Close connection ──────────────────────────────── */
+        app_req->at_cmd = strdup("AT+CIPCLOSE\r\n");
+        if (app_req->at_cmd != NULL)
+        {
+            app_req->cmd_len = strlen(app_req->at_cmd);
+            app_req->cmd_resp = strdup(ESP32C6_AT_RES_OK);
+            spi_AT_app_send_command(app_req);
+
+            rx_buf = (char *)spi_AT_app_get_response(&rx_buf_len, &rx_uid, 3);
+            if (rx_buf) free(rx_buf);
+
+            esp_free_mem(&app_req->at_cmd);
+            esp_free_mem(&app_req->cmd_resp);
+        }
+    }
+    else if (strstr(rx_buf, "ERROR") != NULL)
+    {
+        /* Connection refused or failed */
+        app_req->u.tcp_connect.result = 1;  /* refused */
+        free(rx_buf);
+    }
+    else
+    {
+        /* Unknown response */
+        app_req->u.tcp_connect.result = 3;  /* error */
+        free(rx_buf);
+    }
+
+    return SUCCESS;
+} // uint8_t tcp_connect_probe(ctrl_cmd_t *app_req)

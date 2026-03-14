@@ -28,6 +28,9 @@ uint8_t esp_dev_reset(ctrl_cmd_t *app_req);
 uint8_t wifi_connect_ap(ctrl_cmd_t *app_req);
 uint8_t wifi_disconnect_ap(ctrl_cmd_t *app_req);
 uint8_t wifi_get_ip(ctrl_cmd_t *app_req);
+
+/* CLAWHunter: TCP connect probe via ESP32 AT+CIPSTART */
+uint8_t tcp_connect_probe(ctrl_cmd_t *app_req);
 #endif
 
 #ifdef M1_APP_BADBT_ENABLE

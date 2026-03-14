@@ -34,6 +34,7 @@
 #include "m1_buzzer.h"
 #include "m1_led_indicator.h"
 #include "ctrl_api.h"
+#include "esp_app_main.h"
 #include "m1_compile_cfg.h"
 #include "m1_esp32_hal.h"
 #include "esp_app_main.h"
@@ -271,15 +272,11 @@ static bool probe_host(uint8_t host_octet, uint16_t port)
     r->banner[0] = '\0';
 
     /*
-     * TCP port probe via ESP32 SPI protocol extension.
+     * TCP port probe via ESP32 AT+CIPSTART command.
      *
-     * Sends CTRL_REQ_TCP_CONNECT to the ESP32 co-processor which owns
-     * the LwIP stack. The ESP32 attempts a TCP connection to the target
-     * IP:port and returns the result + any initial banner bytes.
-     *
-     * If the ESP32 firmware does not yet handle CTRL_REQ_TCP_CONNECT
-     * (result will be CTRL_ERR_UNSUPPORTED_MSG or timeout), we fall
-     * back to marking the host as an ARP-level candidate.
+     * Calls tcp_connect_probe() which sends AT+CIPSTART to the ESP32
+     * co-processor, then sends an HTTP GET to read a banner for
+     * OpenClaw signature detection.
      */
     ctrl_cmd_t req = CTRL_CMD_DEFAULT_REQ();
     req.msg_id = CTRL_REQ_TCP_CONNECT;
@@ -293,20 +290,9 @@ static bool probe_host(uint8_t host_octet, uint16_t port)
     req.u.tcp_connect.result = 3;  /* Pre-set to error */
     req.u.tcp_connect.banner_len = 0;
 
-    /*
-     * Dispatch the request. If the ESP32 firmware supports TCP connect,
-     * req.u.tcp_connect.result will be updated:
-     *   0 = connected (port open)
-     *   1 = refused (port closed, host alive)
-     *   2 = timeout (host down or filtered)
-     *   3 = error (unsupported or internal failure)
-     *
-     * Note: The actual SPI dispatch function varies by firmware version.
-     * Until the ESP32 handler is implemented, this will timeout or return
-     * an unsupported error, and we fall through to ARP-level detection.
-     */
+    /* Dispatch TCP probe to ESP32 */
+    tcp_connect_probe(&req);
 
-    /* Check result */
     uint8_t tcp_result = req.u.tcp_connect.result;
 
     if (tcp_result == 0)
