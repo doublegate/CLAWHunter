@@ -1,123 +1,34 @@
 digraph CLAWHunter {
-    graph [
-        bgcolor="#0d1117"
-        fontname="Helvetica Neue,Helvetica,Arial,sans-serif"
-        fontcolor="#e6edf3"
-        fontsize=15
-        pad=0.7
-        splines=curved
-        rankdir=TB
-        nodesep=0.5
-        ranksep=0.5
-        label="CLAWHunter — Project Architecture"
-        labelloc=t
-        labeljust=c
-    ]
-    node [
-        fontname="Helvetica Neue,Helvetica,Arial,sans-serif"
-        fontcolor="#e6edf3"
-        fontsize=10
-        style="filled,rounded"
-        shape=box
-        margin="0.20,0.12"
-    ]
-    edge [
-        fontname="Helvetica Neue,Helvetica,Arial,sans-serif"
-        fontcolor="#8b949e"
-        fontsize=10
-        color="#30363d"
-        arrowsize=0.75
-    ]
+    // Source-of-truth diagram for both docs/architecture.svg and the README PNG.
+    graph [rankdir=TB, bgcolor="#0d1117", fontcolor="#e6edf3", fontname="Helvetica", label="CLAWHunter v3.3.0 Architecture", labelloc=t, pad=0.5]
+    node [shape=box, style="filled,rounded", fontname="Helvetica", fontcolor="#e6edf3", color="#484f58", fillcolor="#161b22"]
+    edge [color="#8b949e", fontcolor="#8b949e", fontname="Helvetica"]
 
-    // ── Rank assignments ───────────────────────────────────────────────────
-    { rank=same; P_USER P_RECON P_ALERT }
-    { rank=same; LIB }
-    { rank=same; FP_PIPELINE HW HARVEST }
-    { rank=same; H_PHASES }
-    { rank=sink;  LOOT }
+    // Entry points match the official Hak5 Payload Library category hierarchy.
+    user [label="User / reconnaissance\nInteractive scan + result browser", color="#58a6ff"]
+    recon [label="Recon / access_point\nSelected AP + 2.4 GHz client", color="#58a6ff"]
+    alert [label="Alert / pineapple_client_connected\nExact triggering client + fast probe", color="#58a6ff"]
+    // Shared behavior belongs here so Recon, alert, and interactive evidence
+    // semantics cannot drift independently.
+    common [label="lib/common.sh\nValidation, evidence scoring, mDNS, ARP, hardware, reports", color="#3fb950", penwidth=2]
+    // Discovery separates unauthenticated hints and IP families before probes.
+    discovery [label="Discovery\n_openclaw-gw._tcp hints\nIPv4 ARP/ping hosts\nIPv6 link-local candidates", color="#d29922"]
+    // The classifier is the only component allowed to create confirmed results.
+    probe [label="Classifier\nTCP + HTTP/S + health/readiness\nWebSocket + connect.challenge\nCONFIRMED / LIKELY / CANDIDATE", color="#d29922"]
+    // Assessment is an explicit action and never participates in discovery.
+    harvest [label="harvest.py\n180s ceiling\nCurrent HTTP/WS evidence\nAuthorized read-only tool calls", color="#a371f7"]
+    // All persistence stays local to the standard Pager loot tree.
+    output [label="/root/loot/clawhunter\nLogs, JSON, harvest reports, watchdog state"]
 
-    // ── Entry Points ───────────────────────────────────────────────────────
-    P_USER [
-        label="payloads/user/clawhunter/payload.sh\nInteractive — all features"
-        fillcolor="#1c3a5e" color="#58a6ff" fontcolor="#93c5fd"
-    ]
-    P_RECON [
-        label="payloads/recon/clawhunter/payload.sh\nRF-first — reads Recon context vars"
-        fillcolor="#1c3a5e" color="#58a6ff" fontcolor="#93c5fd"
-    ]
-    P_ALERT [
-        label="payloads/alert/clawhunter-watchdog/payload.sh\nAuto-fires on client connect  <5s"
-        fillcolor="#1c3a5e" color="#58a6ff" fontcolor="#93c5fd"
-    ]
-
-    // ── Shared Library ─────────────────────────────────────────────────────
-    LIB [
-        label="lib/common.sh  —  Shared Library\nLED · Audio · Haptic · Fingerprinting · Results Browser · Harvest Trigger"
-        fillcolor="#1a2e1a"
-        color="#3fb950"
-        fontcolor="#7ee787"
-        fontsize=11
-        penwidth=2
-        width=6.5
-    ]
-
-    // ── Fingerprinting Pipeline ────────────────────────────────────────────
-    FP_PIPELINE [
-        label="Fingerprinting Pipeline\n─────────────────────────\nStage 0 · mDNS Monitor (avahi-browse)\nStage 1 · ARP Cache Harvest\nStage 2 · Host Discovery (arp-scan/ping)\nStage 3 · TCP Connect (nc -z)\nStage 4 · HTTP/S Probe (curl)\nStage 5 · WebSocket Upgrade  ~99%\nStage 6 · Canvas Path Probe\nStage 7 · /agent/status Intel"
-        fillcolor="#1a1a0d"
-        color="#e3b341"
-        fontcolor="#f0c84a"
-        fontsize=10
-    ]
-
-    // ── Pager Hardware ─────────────────────────────────────────────────────
-    HW [
-        label="Pager Hardware\n─────────────────────────\n480×222 Color Display\nRGB LEDs ×4\nHaptic Vibration\nAudio  RTTTL\n5-Button Navigation"
-        fillcolor="#0d2e1a"
-        color="#56d364"
-        fontcolor="#56d364"
-        fontsize=10
-    ]
-
-    // ── Harvest Engine ─────────────────────────────────────────────────────
-    HARVEST [
-        label="harvest.py\nPython3 · stdlib only\n─────────────────────────\nPhase 1 · Auth Probe\n(OPEN / TOKEN_GATED / UNREACHABLE)"
-        fillcolor="#2a1a2e"
-        color="#bc8cff"
-        fontcolor="#d2a8ff"
-        fontsize=10
-    ]
-
-    // ── Agent Session Phases ───────────────────────────────────────────────
-    H_PHASES [
-        label="Agent Session  (OPEN portals only)\n─────────────────────────────────────────\nPhase 2 · HTTP Harvest  (canvas / a2ui / status)\nTurn 1 · System Enum  (exec · Read)\nTurn 2 · Memory Search  (memory_search)\nTurn 3 · Session History  (sessions_list · sessions_history)\nTurn 4 · Paired Nodes  (nodes)\nTurn 5 · OOB Exfil  (Telegram / Webhook)  optional"
-        fillcolor="#1a0d2a"
-        color="#bc8cff"
-        fontcolor="#d2a8ff"
-        fontsize=10
-        width=5.5
-    ]
-
-    // ── Loot Output ────────────────────────────────────────────────────────
-    LOOT [
-        label="/root/loot/clawhunter/\n─────────────────────────────────────────\nscan_*.log  ·  alert_*.log  ·  scan_*.json  ·  harvest_<IP>_*.log"
-        fillcolor="#161b22"
-        color="#484f58"
-        fontcolor="#8b949e"
-        fontsize=10
-        width=5.5
-    ]
-
-    // ── Edges ──────────────────────────────────────────────────────────────
-    P_USER  -> LIB [color="#3fb950"]
-    P_RECON -> LIB [color="#3fb950"]
-    P_ALERT -> LIB [color="#3fb950"]
-
-    LIB -> FP_PIPELINE [color="#e3b341" xlabel="runs"]
-    LIB -> HW          [color="#56d364" style=dashed xlabel="drives"]
-    LIB -> HARVEST     [color="#bc8cff" xlabel="RIGHT key"]
-
-    FP_PIPELINE -> LOOT    [color="#484f58" xlabel="scan_*.log\nscan_*.json"]
-    HARVEST     -> H_PHASES [color="#bc8cff"]
-    H_PHASES    -> LOOT    [color="#484f58" xlabel="harvest_*.log"]
+    // Data flow ends in local Pager loot; no remote staging/exfiltration exists.
+    {rank=same; user; recon; alert}
+    user -> common
+    recon -> common
+    alert -> common
+    // Shared flow: gather candidates, classify evidence, then persist locally.
+    common -> discovery
+    discovery -> probe
+    probe -> output
+    probe -> harvest [label="confirmed result"]
+    harvest -> output
 }

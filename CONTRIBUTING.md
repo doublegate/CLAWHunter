@@ -1,95 +1,108 @@
 # Contributing to CLAWHunter
 
-Contributions are welcome — new payload variants, fingerprinting improvements, compatibility fixes, and documentation.
+CLAWHunter targets the Hak5 WiFi Pineapple Pager and an OpenWrt/BusyBox userland. Changes must preserve the official Payload Library layout and the shared-library architecture.
 
----
+Use the project only for authorized security testing.
 
-## Environment requirements
+## Required checks
 
-- **Hak5 WiFi Pineapple Pager** (or access to one for testing)
-- **Bash 5.x** — test syntax with `bash -n <file>`
-- **Python 3.6+** — no third-party packages; stdlib only
-- **OpenWRT/busybox constraints** — see [Compatibility rules](#compatibility-rules)
-
----
-
-## Compatibility rules
-
-The Pager runs OpenWRT with a busybox userland. All shell code must work within these constraints:
-
-| ❌ Don't use | ✅ Use instead |
-|-------------|--------------|
-| `grep -oP` (PCRE) | `awk` for field extraction |
-| `shuf` | `awk -v seed=$RANDOM 'BEGIN{srand(seed)}…'` |
-| `/dev/tcp` alone | `/dev/tcp` with `nc -w 3` fallback |
-| `TEXT_PICKER` for passwords / tokens | Display instructions instead — `TEXT_PICKER` works but requires character-by-character physical button input, which is impractical for long strings |
-| `pip` / third-party Python | Python3 stdlib only |
-| `python3 -c "import X"` where X is not stdlib | Not supported |
-
----
-
-## Before submitting a pull request
-
-1. **Syntax check all bash:**
-   ```bash
-   bash -n lib/common.sh
-   bash -n payloads/user/clawhunter/payload.sh
-   bash -n payloads/recon/clawhunter/payload.sh
-   bash -n payloads/alert/clawhunter-watchdog/payload.sh
-   ```
-
-2. **Syntax check Python:**
-   ```bash
-   python3 -m py_compile payloads/user/clawhunter/harvest.py
-   ```
-
-3. **Test on actual hardware** if possible. If not, note in the PR that hardware testing hasn't been done — that's fine, but it should be called out.
-
-4. **Update `CHANGELOG.md`** — add an entry under an `[Unreleased]` heading describing what you changed.
-
-5. **Update `README.md`** if you add, remove, or change user-visible behavior (prompts, controls, LED states, output format, etc.).
-
----
-
-## Payload structure
-
-New user-facing payloads belong in `payloads/user/<name>/payload.sh`. Include the standard Hak5 metadata header:
+Run:
 
 ```bash
-# Title: Your Payload Name
-# Description: What it does in one sentence.
-# Author: Your Name
+scripts/check.sh
 ```
 
-Any shared functions that multiple payloads need should go in `lib/common.sh`, not duplicated across payloads.
+The gate covers Bash syntax, ShellCheck warnings, Python byte-compilation and tests, classifier fixtures, JSON output, version unity, and deterministic release packaging. Report the Pager firmware version and whether physical hardware testing was performed in the pull request.
 
----
+## Layout
 
-## Code style
+```text
+payloads/user/reconnaissance/clawhunter/
+payloads/recon/access_point/clawhunter/
+payloads/alerts/pineapple_client_connected/clawhunter-watchdog/
+lib/common.sh
+```
 
-- Every function: comment block with purpose, params, and side effects
-- Inline comments: explain *why*, not *what*
-- Constants: `UPPER_SNAKE_CASE`; local variables: `lower_snake_case`
-- No magic numbers — named constants with a comment explaining the value
-- Prefer `local` for all variables inside functions
-- All `curl` calls: explicit `--max-time` or `-m` timeout
-- All `nc` calls: explicit `-w` timeout
+Cross-cutting behavior belongs in `lib/common.sh`. Release packages also embed a byte-identical `common.sh` beside each payload so Portal-installed and suite-installed layouts behave the same.
 
----
+## Architecture Contracts
 
-## What makes a good PR
+These behaviors are load-bearing and require regression coverage when changed:
 
-- **Focused** — one feature or fix per PR
-- **Tested** — at minimum, syntax-checked; hardware-tested if possible
-- **Documented** — CHANGELOG entry + README update if user-visible
-- **Compatible** — passes the busybox constraints above
+1. All three entry points source one canonical shared library in the repository.
+2. Release packaging embeds that exact library beside each Portal payload.
+3. mDNS is an unauthenticated hint source and never creates a confirmed finding by itself.
+4. `CONFIRMED` requires OpenClaw-specific evidence, not a generic status code or protocol.
+5. IPv6 link-local neighbors are logged separately and never enter IPv4 sorting/scanning.
+6. Sequential and parallel scans append checkpoints only after every selected port completes.
+7. Parallel workers communicate through private result records; only the parent mutates UI, hardware, logs, checkpoints, and result arrays.
+8. Harvest execution has one global deadline and returns partial evidence instead of hanging.
+9. The client-connected alert targets only the event's exact MAC/IP and stays non-blocking/audio-silent.
+10. Recon handles hidden-SSID context, uses the official encryption values, and pins the selected BSSID on the 2.4 GHz client interface.
+11. `RINGTONE` and `VIBRATE` receive a filename or valid RTTTL string; numeric millisecond vibration arguments are not a Pager command contract.
 
----
+## Compatibility
 
-## Reporting bugs
+- Keep shell behavior compatible with the Pager's Bash and BusyBox utilities.
+- Do not use PCRE-only grep, GNU-only runtime utilities, or Python dependencies outside the standard library.
+- Install large optional packages to eMMC with `opkg install -d mmc`.
+- Put explicit timeouts on every network operation.
+- Treat mDNS TXT data as a hint, not authoritative proof.
+- Keep IPv6 addresses out of IPv4 dot-field sorting and scanning.
+- Make sequential and parallel checkpoint behavior identical.
+- Never interpolate unvalidated network input into a shell command.
 
-Open a GitHub issue. Include:
-- Pager firmware version
-- Which payload variant (`user` / `recon` / `alert`)
-- Relevant log snippet from `/root/loot/clawhunter/`
-- What you expected vs. what happened
+## Commenting Standard
+
+Comments are required where code carries a compatibility, security, concurrency, or device-specific contract. A reviewer should not need to reconstruct the reason from firmware changelogs or protocol source.
+
+Document:
+
+- function inputs, published globals, return values, and side effects when they are not obvious from the signature;
+- why a timeout or size limit has its chosen scope;
+- why a Hak5 event/context variable or category path is authoritative;
+- evidence weights and the boundary between a hint, candidate, and confirmation;
+- shell parent/subprocess ownership of arrays, logs, hardware, and checkpoints;
+- security handling for operator input, gateway secrets, temporary files, and tool allowlists;
+- BusyBox, firmware, eMMC, or Portal constraints behind a non-obvious implementation;
+- release reproducibility and installer layout assumptions.
+
+Do not narrate trivial assignments or restate a command in prose. Keep comments synchronized with behavior; stale protocol comments are bugs.
+
+## Versioning
+
+The version must match in:
+
+- `lib/common.sh`
+- all three `payload.sh` files
+- `harvest.py`
+- release scripts and user-facing documentation
+
+Update `CHANGELOG.md` for every release. `scripts/check.sh` rejects divergent runtime versions.
+
+## Security
+
+Do not add credential collection, authentication bypasses, destructive actions, arbitrary command execution, staged remote code, or out-of-band exfiltration. Gateway credentials must come from protected local configuration or the environment and must never appear in process arguments or logs.
+
+OpenClaw shared gateway credentials provide operator authority. Tests and documentation must preserve that trust-boundary warning.
+
+## Pull Request Checklist
+
+- Run `scripts/check.sh` and include the result.
+- State the Pager firmware used for physical testing, or explicitly state that hardware testing was not performed.
+- Add fixtures for classifier, parser, checkpoint, or report behavior changed by the patch.
+- Update `README.md` for operator-visible workflow, controls, output, dependencies, or troubleshooting changes.
+- Update the current research record when a change depends on new Hak5/OpenClaw behavior.
+- Add a `CHANGELOG.md` entry with user-visible additions, changes, and fixes.
+- Confirm no token, password, target data, generated loot, archive, or Python cache is staged.
+- Confirm all runtime version declarations remain identical.
+
+## Release Process
+
+1. Review current Hak5 Pager documentation, every firmware changelog since the prior release, the official payload repository, and current OpenClaw protocol/security documentation.
+2. Run the complete host gate.
+3. Perform and record the physical Pager checks listed in `README.md` when hardware is available.
+4. Build with `scripts/package-release.sh` in a clean output directory.
+5. Verify the adjacent archive checksum and the internal `SHA256SUMS` manifest.
+6. Review `git diff --check`, repository status, version strings, and release notes.
+7. Merge the reviewed release commit, create the annotated semantic-version tag, and attach both archive and checksum to the GitHub release.

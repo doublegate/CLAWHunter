@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034 # Shared-library runtime globals are set by this payload.
 # Title: CLAWHunter (Recon)
 # Description: RF-first OpenClaw discovery. Launch from the Recon UI after selecting a target AP — automatically reads AP context, connects, scans, and logs found instances.
 # Author: doublegate
@@ -7,7 +8,7 @@
 # For the Hak5 WiFi Pineapple Pager — Runs from Recon UI against a selected AP
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.2.0
+# PAYLOAD_VERSION: 3.3.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -23,28 +24,49 @@
 #   _RECON_SELECTED_AP_BSSID            Target AP BSSID
 #
 # DEPLOY:
-#   scp -r payloads/recon/clawhunter lib \
-#       root@pineapple.lan:/root/payloads/recon/
+#   Use scripts/install-pager.sh from the release bundle.
 #
 # LOG OUTPUT:
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.log
 #   /root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.json
+#
+# TRANSACTION CONTRACT:
+#   Input  - one Recon-selected AP plus an in-memory passphrase when encrypted.
+#   Work   - temporary wlan0cli association, DHCP, mDNS/ARP, sequential probes.
+#   Output - confirmed results and evidence-rich local loot only.
+#   Exit   - disconnect and clear the client configuration on every path.
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.2.0"
-readonly OPENCLAW_DEFAULT_PORT=18790
-readonly OPENCLAW_RANGE_LOW=18780
-readonly OPENCLAW_RANGE_HIGH=18800
-readonly EXTENDED_PORTS="80 443 3000 8080 8443"
+readonly PAYLOAD_VERSION="3.3.0"
+# 18789 is current; 18790 remains a bounded legacy secondary probe in Recon.
+readonly OPENCLAW_DEFAULT_PORT=18789
 readonly LOOT_BASE="/root/loot/clawhunter"
 readonly WIFI_IF="wlan0cli"
 
+# Resolve common.sh in three supported layouts: self-contained Portal payload,
+# installed suite (/root/payloads/lib), and repository checkout for development.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=../../../lib/common.sh
-. "${SCRIPT_DIR}/../../lib/common.sh"
+CLAWHUNTER_PAYLOAD_DIR="$SCRIPT_DIR"
+export CLAWHUNTER_PAYLOAD_DIR
+if [ -f "${SCRIPT_DIR}/common.sh" ]; then
+    # Release/Portal layout: payload resources are self-contained.
+    . "${SCRIPT_DIR}/common.sh"
+elif [ -f "${SCRIPT_DIR}/../../../lib/common.sh" ]; then
+    # Installed suite layout: /root/payloads/lib/common.sh.
+    . "${SCRIPT_DIR}/../../../lib/common.sh"
+elif [ -f "${SCRIPT_DIR}/../../../../lib/common.sh" ]; then
+    # Repository layout: top-level lib/common.sh for development checks.
+    . "${SCRIPT_DIR}/../../../../lib/common.sh"
+else
+    ERROR_DIALOG "Install Error" "CLAWHunter common.sh was not found"
+    exit 1
+fi
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
+# Recon is one transaction: selected AP -> temporary client association -> /24
+# evidence scan -> local loot -> disconnect. Result arrays remain index-aligned
+# and contain confirmed endpoints only, exactly like interactive mode.
 SILENT=0
 FOUND_COUNT=0
 HOSTS_SCANNED=0
@@ -56,8 +78,8 @@ LOG_FILE=""
 LOCAL_IP=""
 SUBNET=""
 TARGET_PORT=$OPENCLAW_DEFAULT_PORT
-ALL_PORTS="$TARGET_PORT"
-PORT_DESC="$TARGET_PORT"
+ALL_PORTS="$TARGET_PORT 18790"
+PORT_DESC="${TARGET_PORT}+legacy"
 HOST_START=1
 HOST_END=254
 WIFI_CONNECTED=0
@@ -67,8 +89,12 @@ mkdir -p "$LOOT_BASE"
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 cleanup() {
+    # The trap runs for normal exit, UI cancellation, signals, and early errors.
+    # Clear client configuration as well as disconnecting so an entered WPA/SAE
+    # passphrase does not remain configured after this payload owns the session.
     led_off
     [ $WIFI_CONNECTED -eq 1 ] && WIFI_DISCONNECT "$WIFI_IF" &>/dev/null || true
+    WIFI_CLEAR "$WIFI_IF" >/dev/null 2>&1 || true
     [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && \
         log_entry "Recon payload exited (cleanup)"
 }
@@ -86,13 +112,25 @@ sleep 1
 SSID="${_RECON_SELECTED_AP_SSID:-}"
 ENC="${_RECON_SELECTED_AP_ENCRYPTION_TYPE:-}"
 BSSID="${_RECON_SELECTED_AP_BSSID:-}"
+HIDDEN="${_RECON_SELECTED_AP_HIDDEN:-false}"
 
-if [ -z "$SSID" ]; then
-    led_error
-    ERROR_DIALOG "No AP Selected" "Launch from Recon UI with an AP selected. SSID not set."
-    exit 1
+# Current Recon context explicitly marks hidden APs, while older/current rows
+# may expose an empty or literal `(hidden)` primary SSID. Prompt only for that
+# missing public identifier; the passphrase prompt remains a separate step.
+if [ "$HIDDEN" = "true" ] || [ "$HIDDEN" = "1" ] || \
+   [ -z "$SSID" ] || [ "$SSID" = "(hidden)" ]; then
+    SSID=$(TEXT_PICKER "SSID for hidden AP" "")
+    case $? in
+        "$DUCKYSCRIPT_CANCELLED"|"$DUCKYSCRIPT_REJECTED"|"$DUCKYSCRIPT_ERROR") exit 0 ;;
+    esac
+    if [ -z "$SSID" ]; then
+        ERROR_DIALOG "SSID Required" "A hidden access point needs its exact SSID"
+        exit 1
+    fi
 fi
 
+# BSSID is expected from a selected Recon row and pins the association when
+# present; it is never inferred from another AP sharing the entered SSID.
 LOG blue "Target AP: $SSID"
 [ -n "$BSSID" ] && LOG blue "BSSID: $BSSID"
 LOG blue "Enc: ${ENC:-open}"
@@ -100,16 +138,39 @@ sleep 1
 
 # ── Prompt for password if encrypted ─────────────────────────────────────────
 
-PASS=""
-ENC_LC=$(echo "${ENC:-open}" | tr '[:upper:]' '[:lower:]')
-if ! echo "$ENC_LC" | grep -qE '^(open|none|)$'; then
-    # TEXT_PICKER exists but is impractical for passwords (5-button char-by-char input) —
-    # the AP pre-joined. Notify user and attempt connection with empty password
-    # (works if credentials are already saved on the Pager).
-    LOG red "Encrypted AP: $SSID"
-    LOG blue "Pre-join via Settings if needed"
-    sleep 2
-    PASS=""
+# wlan0cli is the Pager's 2.4 GHz client interface. Firmware/context versions
+# may provide either numeric frequency or channel, so validate before arithmetic
+# and reject an unsupported selected band rather than timing out ambiguously.
+AP_FREQ="${_RECON_SELECTED_AP_FREQ:-}"
+AP_CHANNEL="${_RECON_SELECTED_AP_CHANNEL:-}"
+if { [[ "$AP_FREQ" =~ ^[0-9]+$ ]] && [ "$AP_FREQ" -ge 5000 ]; } || \
+   { [ -z "$AP_FREQ" ] && [[ "$AP_CHANNEL" =~ ^[0-9]+$ ]] && [ "$AP_CHANNEL" -ge 36 ]; }; then
+    ERROR_DIALOG "Unsupported Band" "wlan0cli supports only 2.4 GHz access points"
+    exit 1
+fi
+
+# These values and the five-argument call below mirror Hak5's current official
+# Connect-To-AP payload. The operator-entered passphrase is held in memory only;
+# it is never written to loot, config, command arguments, or UI history here.
+case "$ENC" in
+    *WPA3*|*SAE*|*sae*) WIFI_ENC="sae" ;;
+    *WPA2*|*PSK2*|*psk2*) WIFI_ENC="psk2" ;;
+    *WPA*|*PSK*|*psk*) WIFI_ENC="psk" ;;
+    *Open*|*open*|*NONE*|*none*|"") WIFI_ENC="open" ;;
+    *) ERROR_DIALOG "Unsupported Encryption" "$ENC"; exit 1 ;;
+esac
+
+if [ "$WIFI_ENC" = "open" ]; then
+    # Hak5's current WIFI_CONNECT contract uses the literal NONE for open APs.
+    PASS="NONE"
+else
+    # TEXT_PICKER returns status through `$?`; cancellation exits before any
+    # client configuration or loot file is created.
+    PASS=$(TEXT_PICKER "Password for ${SSID}" "")
+    case $? in
+        "$DUCKYSCRIPT_CANCELLED"|"$DUCKYSCRIPT_REJECTED"|"$DUCKYSCRIPT_ERROR") exit 0 ;;
+    esac
+    [ -n "$PASS" ] || { ERROR_DIALOG "Password Required" "Encrypted AP selected"; exit 1; }
 fi
 
 # ── Connect to AP ─────────────────────────────────────────────────────────────
@@ -118,14 +179,21 @@ LOG blue "Connecting to $SSID..."
 led_wifi_connect
 SID=$(START_SPINNER "Connecting to ${SSID}...")
 
-if [ -z "$PASS" ]; then
-    WIFI_CONNECT "$WIFI_IF" "$SSID" "open" "" "ANY" &>/dev/null
-else
-    WIFI_CONNECT "$WIFI_IF" "$SSID" "psk2" "$PASS" "ANY" &>/dev/null
+# Pin the selected BSSID so a duplicate SSID cannot redirect the assessment to a
+# different access point. ANY is used only when older context omits the BSSID.
+WIFI_CLEAR "$WIFI_IF" >/dev/null 2>&1 || true
+if ! WIFI_CONNECT "$WIFI_IF" "$SSID" "$WIFI_ENC" "$PASS" "${BSSID:-ANY}" >/dev/null 2>&1; then
+    STOP_SPINNER "$SID"
+    ERROR_DIALOG "Connect Failed" "WIFI_CONNECT rejected the selected AP"
+    exit 1
 fi
 
+# WIFI_CONNECT can return before DHCP completes. Poll only the selected client
+# interface for at most 30 seconds and derive the scan network from its address.
 READY=0
 for _i in $(seq 1 30); do
+    # Query only wlan0cli. An address on management/PineAP interfaces must not
+    # be mistaken for successful association to the selected target AP.
     CIDR=$(ip -4 -o addr show dev "$WIFI_IF" 2>/dev/null | awk '{print $4}' | head -1)
     if [ -n "$CIDR" ]; then READY=1; break; fi
     sleep 1
@@ -135,6 +203,10 @@ STOP_SPINNER "$SID"
 
 if [ $READY -eq 1 ]; then
     LOCAL_IP="${CIDR%%/*}"
+    if ! is_valid_ipv4 "$LOCAL_IP"; then
+        ERROR_DIALOG "Connect Failed" "Client interface returned invalid IPv4 data"
+        exit 1
+    fi
     WIFI_CONNECTED=1
     ringtone_wifi_ok; vibrate_medium
     LOG green "Connected: $LOCAL_IP"
@@ -147,20 +219,22 @@ fi
 
 # ── Auto-derive subnet ────────────────────────────────────────────────────────
 
-SUBNET=$(echo "$LOCAL_IP" | cut -d. -f1-3)
+# CLAWHunter deliberately bounds Recon work to the connected IPv4 /24 rather
+# than interpreting an arbitrary route/prefix from untrusted network metadata.
+SUBNET=$(subnet_prefix_from_ip "$LOCAL_IP")
 LOG blue "Subnet: ${SUBNET}.0/24"
 sleep 1
 
-# ── Run mDNS prescan (one-shot — recon variant is fast) ───────────────────────
-
-mdns_prescan
-
-# ── Port sweep ────────────────────────────────────────────────────────────────
+# ── Initialize evidence log and run one-shot discovery ────────────────────────
+# The file must exist before mdns_prescan emits entries. Active discovery and
+# the sequential port sweep then append to the same chronological evidence log.
 
 SCAN_ID="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOOT_BASE/scan_${SCAN_ID}.log"
 
 {
+    # The header records all non-secret context needed to reproduce the run.
+    # PASS is intentionally absent; ENC documents only the public AP mode.
     echo "=================================================="
     echo "  CLAWHunter v${PAYLOAD_VERSION} — Recon Variant"
     echo "  Hak5 WiFi Pineapple Pager"
@@ -180,6 +254,10 @@ LOG_FILE="$LOOT_BASE/scan_${SCAN_ID}.log"
     echo ""
 } > "$LOG_FILE"
 
+# Create the log before mDNS so passive hints are retained rather than displayed
+# transiently and overwritten by the later scan header.
+mdns_prescan
+
 log_section "PORT SCAN"
 
 # ── ARP cache harvest (C2) before discovery ───────────────────────────────────
@@ -192,6 +270,8 @@ SID=$(START_SPINNER "ARP host discovery...")
 raw_hosts=$(arp_discover_hosts "$SUBNET" "$HOST_START" "$HOST_END" 2>/dev/null)
 
 if [ -n "$cache_hosts" ]; then
+    # Both sources are IPv4-only; de-duplicate with the numeric final octet so
+    # cached and actively discovered entries share one deterministic work list.
     raw_hosts=$(printf '%s\n%s\n' "$cache_hosts" "$raw_hosts" | sort -u -t. -k4 -n)
 fi
 
@@ -199,6 +279,8 @@ STOP_SPINNER "$SID"
 
 declare -a LIVE_HOSTS=()
 while IFS= read -r h; do
+    # arp_cache_harvest/arp_discover_hosts already constrain results to IPv4;
+    # retain a simple array so progress denominators remain stable.
     [ -n "$h" ] && LIVE_HOSTS+=("$h")
 done <<< "$raw_hosts"
 
@@ -222,8 +304,9 @@ led_scanning
 SID=$(START_SPINNER "Probing (0/${TOTAL_LIVE}, 0%)...")
 probe_idx=0
 
+# Recon remains sequential to minimize interference with the UI's selected-AP
+# workflow. Each host can produce multiple confirmed endpoints (one per port).
 for IP in "${LIVE_HOSTS[@]}"; do
-    local btn
     btn=$(timeout 0.05 sh -c 'WAIT_FOR_INPUT 2>/dev/null' 2>/dev/null || true)
     if [ "$btn" = "B" ]; then ABORT=1; break; fi
 
@@ -237,6 +320,8 @@ for IP in "${LIVE_HOSTS[@]}"; do
     SID=$(START_SPINNER "${pct}% — ${IP} ($probe_idx/${TOTAL_LIVE})...")
 
     for PORT in $ALL_PORTS; do
+        # One host may expose multiple gateway bindings, so do not stop after a
+        # confirmed default port; record every selected-port classification.
         probe_openclaw "$IP" "$PORT" || continue
 
         if [ $PROBE_CONFIRMED -eq 1 ]; then
@@ -260,6 +345,8 @@ for IP in "${LIVE_HOSTS[@]}"; do
             SID=$(START_SPINNER "${pct}% — ${IP} ($probe_idx/${TOTAL_LIVE})...")
 
         elif [ $PROBE_CANDIDATE -eq 1 ]; then
+            # Candidates receive transient operator feedback but never enter
+            # FOUND_HOSTS, JSON instances, history, or assessment selection.
             STOP_SPINNER "$SID"
             led_candidate; ringtone_candidate; vibrate_soft
             LOG blue "? Open: ${IP}:${PORT} (HTTP ${PROBE_HTTP_CODE}, ${PROBE_SCHEME})"
@@ -276,6 +363,7 @@ STOP_SPINNER "$SID"
 [ $ABORT -eq 1 ] && ringtone_abort && LOG red "Scan aborted" && log_entry "SCAN ABORTED"
 
 # ── D1: JSON report ───────────────────────────────────────────────────────────
+# JSON contains only confirmed results; text loot retains candidate evidence.
 write_json_report "$SCAN_ID" "${SUBNET}.1-254" "$HOSTS_SCANNED" "$SECONDS"
 
 # ── Log footer ────────────────────────────────────────────────────────────────
@@ -314,6 +402,7 @@ else
 fi
 sleep 1
 
+# Assessment remains an explicit RIGHT-button action on a confirmed endpoint.
 show_results_browser
 
 # ── Disconnect ────────────────────────────────────────────────────────────────

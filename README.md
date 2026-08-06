@@ -1,612 +1,532 @@
-# ✦ CLAWHunter
+# CLAWHunter
 
 <img src="images/pager-transparent.png" width="450" alt="WiFi Pineapple Pager">
 
-A [Hak5 WiFi Pineapple Pager](https://docs.hak5.org/wifi-pineapple-pager/) payload **suite** for discovering and exploiting [OpenClaw](https://docs.openclaw.ai) AI gateway instances on local networks. Three payload variants — interactive, recon-triggered, and alert-fired — share a common fingerprinting library with full hardware integration: color display, RGB LEDs, haptic feedback, audio cues, interactive results browser, and an integrated post-exploitation harvest engine.
+CLAWHunter v3.3.0 is a Hak5 WiFi Pineapple Pager payload suite for finding and assessing OpenClaw gateways on an authorized local network. The interactive, recon-triggered, and client-connected alert payloads share one evidence-based fingerprinting library and integrate with the Pager display, LEDs, haptics, audio, and loot browser.
 
-![Platform](https://img.shields.io/badge/platform-Hak5%20WiFi%20Pineapple%20Pager-red)
-![Language](https://img.shields.io/badge/script-Bash%20%2B%20Python3-yellow)
-![Category](https://img.shields.io/badge/category-Reconnaissance%20%2F%20Exploitation-blue)
-![Version](https://img.shields.io/badge/version-3.2.0-green)
+Use this project only on systems and networks you own or are explicitly authorized to assess.
 
----
+![Platform](https://img.shields.io/badge/platform-WiFi%20Pineapple%20Pager-red)
+![Language](https://img.shields.io/badge/language-Bash%20%2B%20Python3-yellow)
+![Version](https://img.shields.io/badge/version-3.3.0-green)
 
-![CLAWHunter Architecture](images/architecture.png)
-
----
+![CLAWHunter architecture](images/architecture.png)
 
 ## Contents
 
-1. [Repository structure](#repository-structure)
-2. [Prerequisites & deploy](#prerequisites--deploy)
-3. [Payload variants](#payload-variants)
-4. [Usage — User payload](#usage--user-payload)
-5. [Scan speed profiles](#scan-speed-profiles)
-6. [Controls](#controls)
-7. [OpenClaw fingerprinting pipeline](#openclaw-fingerprinting-pipeline)
-8. [Harvest module](#harvest-module)
-9. [Hardware features](#hardware-features)
-10. [Display behavior](#display-behavior)
-11. [LED states](#led-states)
-12. [Port reference](#port-reference)
-13. [External tools & fallbacks](#external-tools--fallbacks)
-14. [Log & report output](#log--report-output)
-15. [Troubleshooting](#troubleshooting)
-16. [Version history](#version-history)
+1. [Compatibility](#compatibility)
+2. [Repository structure](#repository-structure)
+3. [Install](#install)
+4. [Payloads](#payloads)
+5. [Interactive workflow](#interactive-workflow)
+6. [Detection](#detection)
+7. [Scan profiles](#scan-profiles)
+8. [Checkpoints and parallelism](#checkpoints-and-parallelism)
+9. [Hardware feedback](#hardware-feedback)
+10. [Assessment engine](#assessment-engine)
+11. [Output](#output)
+12. [Dependency fallbacks](#dependency-fallbacks)
+13. [Troubleshooting](#troubleshooting)
+14. [Development and release](#development-and-release)
+15. [Research sources](#research-sources)
 
----
+## Compatibility
 
-## Repository structure
+- WiFi Pineapple Pager firmware 1.1.0 or newer is recommended.
+- Bash and the Pager DuckyScript command library are required.
+- Python 3 is optional and used only by the harvest/assessment engine.
+- `avahi-utils` improves exact OpenClaw mDNS discovery.
+- `arp-scan` improves Layer 2 discovery; ping/arping fallbacks remain available.
+- IPv4 scanning is supported. IPv6 link-local neighbors are logged as candidates only.
 
-```
-CLAWHunter/
-├── docs/
-│   ├── V3-RESEARCH.md                ← Protocol research, feature specs, stretch goals
-│   ├── architecture.dot              ← Graphviz source for architecture diagram
-│   └── architecture.svg              ← Architecture diagram (vector)
-├── images/
-│   ├── architecture.png              ← Architecture diagram (rendered)
-│   └── pager-transparent.png         ← Pager hero image
-├── lib/
-│   └── common.sh                     ← Shared library (LED, audio, fingerprinting, harvest trigger)
-├── payloads/
-│   ├── user/clawhunter/
-│   │   ├── payload.sh                ← Interactive payload (all features)
-│   │   └── harvest.py                ← Post-exploitation harvest engine (Python3, stdlib-only)
-│   ├── recon/clawhunter/
-│   │   └── payload.sh                ← Recon variant (RF-first, auto-connect)
-│   └── alert/clawhunter-watchdog/
-│       └── payload.sh                ← Alert variant (auto-fires, <5s, silent)
-├── CHANGELOG.md                      ← Full version history with dates
-└── CONTRIBUTING.md                   ← Contribution guidelines and compatibility rules
-```
-
----
-
-## Prerequisites & deploy
-
-### Hardware requirements
-
-- Hak5 WiFi Pineapple Pager (4 GB internal eMMC — no microSD required)
-
-### Optional packages (install via SSH on the Pager)
-
-> The `-d mmc` flag installs to the Pager's internal 4 GB eMMC partition (where `/root`, payloads, and loot live), not a microSD card. The root overlay has <32 MB free after firmware — always use `-d mmc` for larger packages like python3.
+Install larger optional packages to eMMC, not the small root overlay:
 
 ```bash
 opkg update
-opkg install -d mmc avahi-utils   # mDNS discovery (Stage 0)
-opkg install -d mmc arp-scan      # faster Layer-2 host discovery
-opkg install -d mmc python3       # required for harvest module
+opkg install -d mmc python3
+opkg install -d mmc avahi-utils arp-scan
 ```
 
-### Deploy all at once (recommended)
+CLAWHunter bootstraps `/mmc/bin`, `/mmc/sbin`, `/mmc/usr/bin`, `/mmc/usr/sbin`, and `/mmc/usr/lib` at runtime.
+
+### Firmware notes
+
+| Firmware | CLAWHunter status | Relevant behavior |
+| --- | --- | --- |
+| 1.1.0+ | Recommended | Pager Portal payload management and monitor-interface stability fixes |
+| 1.0.9 | Minimum research baseline | Corrected Recon client variables and user payload-home behavior |
+| 1.0.8 | Not recommended for v3.3 | Added list picker, payload metadata, and line-ending rewriting, but predates later context fixes |
+| 1.0.7 and older | Unsupported for v3.3 | Missing later payload-context and Portal fixes |
+
+The payloads keep local/shared-library fallback resolution rather than relying on `_PAYLOAD_HOME`, so manual, Portal, and repository layouts remain testable. Firmware-specific details and every reviewed changelog are recorded in [docs/V3.3-RESEARCH.md](docs/V3.3-RESEARCH.md).
+
+## Repository Structure
+
+```text
+CLAWHunter/
+|-- .github/workflows/quality.yml
+|-- docs/
+|   |-- V3-RESEARCH.md
+|   |-- V3.3-RESEARCH.md
+|   |-- architecture.dot
+|   `-- architecture.svg
+|-- images/
+|   |-- architecture.png
+|   `-- pager-transparent.png
+|-- lib/common.sh
+|-- payloads/
+|   |-- user/reconnaissance/clawhunter/
+|   |   |-- payload.sh
+|   |   `-- harvest.py
+|   |-- recon/access_point/clawhunter/payload.sh
+|   `-- alerts/pineapple_client_connected/clawhunter-watchdog/payload.sh
+|-- scripts/
+|   |-- check.sh
+|   |-- install-pager.sh
+|   `-- package-release.sh
+|-- tests/
+|   |-- test_common.sh
+|   `-- test_harvest.py
+|-- CHANGELOG.md
+|-- CONTRIBUTING.md
+`-- README.md
+```
+
+The repository stores one canonical `lib/common.sh`. The release packager embeds a byte-identical copy beside each payload because the official Hak5 Payload Library requires payload resources to be self-contained.
+
+## Install
+
+Download and unpack `clawhunter-v3.3.0-pager.tar.gz` from the GitHub release, transfer the directory to the Pager, then run:
 
 ```bash
-# Create directories on the Pager:
-ssh root@pineapple.lan "mkdir -p \
-    /root/payloads/lib \
-    /root/payloads/user/clawhunter \
-    /root/payloads/recon/clawhunter \
-    /root/payloads/alert/clawhunter-watchdog"
-
-# Copy shared library:
-scp lib/common.sh \
-    root@pineapple.lan:/root/payloads/lib/common.sh
-
-# Copy user payload + harvest engine:
-scp payloads/user/clawhunter/payload.sh \
-    payloads/user/clawhunter/harvest.py \
-    root@pineapple.lan:/root/payloads/user/clawhunter/
-
-# Copy recon and alert payloads:
-scp payloads/recon/clawhunter/payload.sh \
-    root@pineapple.lan:/root/payloads/recon/clawhunter/
-scp payloads/alert/clawhunter-watchdog/payload.sh \
-    root@pineapple.lan:/root/payloads/alert/clawhunter-watchdog/
+./scripts/install-pager.sh
 ```
 
-Or with rsync (preserves structure automatically):
+The installer places payloads in the category structure used by the official Hak5 Pager Payload Library:
 
-```bash
-rsync -av lib/ root@pineapple.lan:/root/payloads/lib/
-rsync -av payloads/ root@pineapple.lan:/root/payloads/
-```
-
-### Expected layout on Pager after deploy
-
-```
+```text
 /root/payloads/
-├── lib/
-│   └── common.sh
-├── user/clawhunter/
-│   ├── payload.sh
-│   └── harvest.py          ← required for harvest module
-├── recon/clawhunter/
-│   └── payload.sh
-└── alert/clawhunter-watchdog/
-    └── payload.sh
+|-- lib/common.sh
+|-- user/reconnaissance/clawhunter/
+|   |-- payload.sh
+|   |-- harvest.py
+|   `-- common.sh
+|-- recon/access_point/clawhunter/
+|   |-- payload.sh
+|   `-- common.sh
+`-- alerts/pineapple_client_connected/clawhunter-watchdog/
+    |-- payload.sh
+    `-- common.sh
 ```
 
-### OOB exfil configuration (optional — configure before deploy)
+The release includes a `SHA256SUMS` manifest inside the archive and a separate `.sha256` file for the archive itself.
 
-If using the out-of-band exfil feature, uncomment and fill in the constants near the top of `payloads/user/clawhunter/payload.sh` **before** copying to the Pager:
+### Verify the release
 
 ```bash
-# ── Out-of-band exfil config (optional — fill in before deploying) ──────────
-# EXFIL_BOT_TOKEN=""   # Telegram bot token (from @BotFather)
-# EXFIL_CHAT_ID=""     # Telegram chat_id to receive exfil data
-# EXFIL_WEBHOOK_URL="" # Alternative: HTTPS webhook URL
+sha256sum -c clawhunter-v3.3.0-pager.tar.gz.sha256
+tar -xzf clawhunter-v3.3.0-pager.tar.gz
+cd clawhunter-v3.3.0
+sha256sum -c SHA256SUMS
 ```
 
-> `TEXT_PICKER` exists in DuckyScript but works character-by-character using the 5 physical buttons — impractical for passwords and API tokens. All credentials must be pre-configured before deployment.
+The external checksum validates the downloaded archive. The internal manifest validates every runtime, documentation, and installer file after extraction.
 
----
+### Transfer to the Pager
 
-## Payload variants
+One manual transfer flow is:
 
-### User payload — `payloads/user/clawhunter/`
-
-Full interactive experience. Launched from **Payloads → user → clawhunter** in the Pager UI. Includes all v2.1.0 and v3.x features: upfront option pickers, continuous mDNS monitor, ARP cache harvest, scan speed profiles, MAC randomization, interactive results browser, cross-run history/diff, watchdog mode, and the integrated harvest engine.
-
-**Primary payload for manual field ops.**
-
-### Recon payload — `payloads/recon/clawhunter/`
-
-RF-first workflow. Launched from the **Recon UI** after selecting a target AP. Reads `_RECON_SELECTED_AP_SSID`, `_RECON_SELECTED_AP_ENCRYPTION_TYPE`, and `_RECON_SELECTED_AP_BSSID` context variables automatically — no manual subnet or port pickers needed.
-
-**Flow:** Recon UI selects AP → payload reads AP context → pre-saved credential notice (if WPA) → connect → mDNS prescan → ARP discovery → port sweep → results browser → disconnect
-
-### Alert payload — `payloads/alert/clawhunter-watchdog/`
-
-Zero-interaction auto-trigger. Fires whenever a client connects to the Pager's AP. Probes the connecting client's IP directly — no subnet sweep. Completes in <5 seconds. Silent forced. Vibrates on confirmed finds. Logs to `/root/loot/clawhunter/alert_YYYYMMDD_HHMMSS.log`.
-
----
-
-## Usage — User payload
-
-Launch from **Payloads → user → clawhunter** in the Pager UI.
-
-### Upfront prompts (before scan)
-
-| Prompt | Default | Description |
-|--------|---------|-------------|
-| View scan history? | No | Browse past finds across all scan logs (only shown if prior logs exist) |
-| Silent mode? | No | Suppress all audio and vibration |
-| Randomize MAC? | No | Randomize scanner MAC before scan, restore on exit via cleanup trap |
-| Scan profile | NORMAL | GHOST / QUIET / NORMAL / FAST / AGGRESSIVE |
-| Connect to AP first? | No | WiFi client mode — requires Recon UI AP selection or pre-saved credentials |
-| Target subnet | Auto-detected | First three octets (e.g. `192.168.4`) |
-| OpenClaw port | `18790` | Primary target port |
-| Advanced options? | No | Gate for port range / extended ports / randomize order |
-| → Wide port range? | No | Sweep `18780–18800` instead of single port |
-| → Extended ports? | No | Also probe 80, 443, 3000, 8080, 8443 |
-| → Randomize order? | No | Shuffle host list (awk PRNG — busybox compatible) |
-| Full /24 scan? | Yes | 254 hosts (~90s NORMAL) or quick `.1–.50` (~20s) |
-| mDNS dwell (sec) | 30 | Continuous mDNS monitor duration *(only shown if `avahi-browse` installed)* |
-
-### Post-scan prompts (after scan completes with finds)
-
-| Prompt | Default | Description |
-|--------|---------|-------------|
-| Watchdog mode? | No | Periodic rescan; alerts only on new/gone instances *(only offered if ≥1 found)* |
-| → Rescan interval (min) | 5 | Minutes between watchdog rescans |
-
-### WiFi client mode — note on password entry
-
-`TEXT_PICKER` is a valid DuckyScript command but requires character-by-character input using the 5 physical buttons — workable for short strings, but impractical for SSIDs, passwords, and API tokens.
-
-- **SSID:** Launch from the **Recon UI** with a target AP selected — the payload reads `_RECON_SELECTED_AP_SSID` automatically.
-- **Password:** Pre-save the AP credentials via the Pager's WiFi Settings before running. The payload connects using saved credentials. If credentials are not saved and the AP is encrypted, a notice is shown and the connection is attempted anyway (may fail).
-
----
-
-## Scan speed profiles
-
-| Profile | Behavior | Dither (base + jitter) | Notes |
-|---------|----------|----------------------|-------|
-| **GHOST** | Passive only — mDNS monitor + ARP cache harvest, no port probes | none | Zero active traffic |
-| **QUIET** | Sequential probes, 50ms floor, silent mode forced | 50ms + 0–200ms | Mimics human-paced browsing |
-| **NORMAL** | Sequential probes, default behavior | 0ms + 0–80ms | Breaks metronomic timing |
-| **FAST** | Parallel probes (3 hosts at a time) | 0ms + 0–25ms | ~3× throughput |
-| **AGGRESSIVE** | All ports + extended, 5 parallel probes | none | Speed priority; IDS risk accepted |
-
-Dither applies `$RANDOM % (jitter+1)` — bash builtin, no external tools. Combines with randomized host order for two-axis IDS evasion: *what* is scanned is shuffled, *when* each probe fires is dithered.
-
----
-
-## Controls
-
-| Button | Context | Action |
-|--------|---------|--------|
-| UP / DOWN | Pickers | Adjust value |
-| UP / DOWN | Profile selector | Change profile |
-| B | Profile selector | Confirm selection |
-| B | Any picker | Cancel / use default |
-| B | During scan | Abort scan cleanly |
-| B | mDNS countdown | Skip mDNS monitor, proceed to scan |
-| UP / DOWN | Results browser | Navigate found hosts |
-| RIGHT *(or any key ≠ UP/DOWN/B/LEFT)* | Results browser | Launch harvest against current find |
-| B or LEFT | Results browser | Exit results browser |
-| UP / DOWN | History browser | Navigate past finds |
-| B or LEFT | History browser | Exit history browser |
-| B | Watchdog countdown | Exit watchdog mode |
-| Any | ALERT popup | Dismiss and continue |
-| Any | Final PROMPT | Exit payload |
-
----
-
-## OpenClaw fingerprinting pipeline
-
-Detection runs in stages per host:port. Each stage gates the next.
-
-### Stage 0 — mDNS monitor
-Continuous `avahi-browse -a -r -p` for the configured dwell (default 30s). Countdown shown on display. LED pulses cyan. Any record matching `openclaw` or `clawd` = confirmed find, added before port sweep. Requires `avahi-browse` (`opkg install -d mmc avahi-utils`).
-
-### Stage 1 — ARP cache harvest
-Before active discovery, checks `/proc/net/arp` and `ip neigh show`. Known hosts skip ARP scanning entirely, speeding up the discovery phase.
-
-### Stage 2 — Host discovery
-`arp-scan` → `arping` → `ping` fallback. Builds the live-host list for the sweep. Falls back gracefully if `arp-scan` or `arping` are not installed.
-
-### Stage 3 — TCP connect
-`nc -z -w 1` fast closed-port filter. Skips curl probe on closed ports.
-
-### Stage 4 — HTTP/HTTPS probe
-`curl` with 3s timeout. Tries `http://` then `https://` per port. **Confirmed** if: body contains `openclaw`, `clawd`, or `gateway` keyword, OR HTTP 400/401/403 on the primary target port. **Candidate** if: any HTTP response on extended ports.
-
-### Stage 5 — WebSocket upgrade probe
-Raw WS upgrade handshake via `/dev/tcp` with `nc` fallback:
-
-```
-GET / HTTP/1.1
-Upgrade: websocket
-Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
-Sec-WebSocket-Version: 13
+```bash
+scp -r clawhunter-v3.3.0 root@pineapple.lan:/tmp/
+ssh root@pineapple.lan '/tmp/clawhunter-v3.3.0/scripts/install-pager.sh'
 ```
 
-A valid OpenClaw gateway accepts the WS upgrade (HTTP 101) before requiring auth. Any other HTTP server either fails the upgrade or returns a non-101 response. Detection confidence: **~99%**.
+The installer accepts an alternate destination as its first argument. This is used by the automated gate and can also stage the exact Pager tree on another mounted filesystem:
 
-### Stage 6 — Canvas path probe
-`GET /__openclaw__/canvas/` and `GET /__openclaw__/a2ui/`. These URL paths are unique to OpenClaw. Any non-404 response is near-certain confirmation, even without auth.
-
-### Stage 7 — `/agent/status` intel
-`GET /agent/status?session=agent:main:main`. If live, extracts and displays:
-- Model in use (e.g. `anthropic/claude-opus-4-6`)
-- Context usage percentage
-- Active tool calls count
-- Sub-agent count
-- Gateway uptime timestamp
-
----
-
-## Harvest module
-
-The integrated post-exploitation engine. Triggered from the **Results Browser** — no separate tool or shell access required.
-
-### Requirements
-
-- **python3** on the Pager: `opkg install -d mmc python3`
-- **harvest.py** deployed at `/root/payloads/user/clawhunter/harvest.py`
-- `harvest.py` uses Python3 stdlib only — no pip, no third-party packages required
-
-### How to trigger
-
-1. Run the user payload until a confirmed OpenClaw instance appears in the Results Browser
-2. Navigate to the target with **UP/DOWN**
-3. Press **RIGHT** (or any key other than UP/DOWN/B/LEFT)
-4. Respond to the **"Out-of-band exfil?"** and **"Exfil method?"** prompts
-5. Harvest runs — spinner active — completes with ALERT on success
-
-Results Browser display:
-
-```
-  Find 1/1                        ← green
-    192.168.4.100                 ← green
-    port: 18790                   ← blue
-    http:// | HTTP 401 | ...
-    UP/DOWN=nav  B=done  >=harvest
+```bash
+./scripts/install-pager.sh /tmp/payload-staging
 ```
 
-### Three-phase harvest
+## Payloads
 
-| Phase | Name | Auth required | What it collects |
-|-------|------|--------------|-----------------|
-| 1 | Auth probe | None | Classifies target: OPEN / TOKEN_GATED / UNREACHABLE |
-| 2 | HTTP harvest | None | `/__openclaw__/canvas/`, `/__openclaw__/a2ui/`, `/agent/status`, `/` — status codes, headers, body content |
-| 3 | Multi-turn agent session | **Open portal only** | 4–5 sequential turns using the agent's native tools |
+### Interactive
 
-### Agent session turns (OPEN portals only)
+Path: `payloads/user/reconnaissance/clawhunter/`
 
-| Turn | Label | Agent tools used | Per-turn timeout |
-|------|-------|-----------------|-----------------|
-| 1 | System enumeration | `exec` (uname, id, env, ps, ls, find, grep), `Read` (openclaw.json, secrets.json, .env, MEMORY.md, USER.md, TOOLS.md) | 60s |
-| 2 | Memory semantic search | `memory_search` — 16 credential/secret keywords | 30s |
-| 3 | Session history | `sessions_list`, `sessions_history` (last 20 msgs × 5 sessions) | 30s |
-| 4 | Paired nodes | `nodes` action=status, action=describe | 20s |
-| 5 | OOB exfil *(optional)* | `exec` — curl POST to Telegram bot API or webhook URL | 20s |
+Runs mDNS and ARP discovery, scans a selected IPv4 /24, supports Ghost through Aggressive profiles, writes JSON/log reports, checkpoints interrupted scans, browses results, and can launch the bounded assessment engine for a confirmed target.
 
-**Turn 1** collects: system identity (`uname -a`, `id`, `hostname`, `uptime`), network config (`ip addr`, `ip route`), running processes (`ps aux`), environment (`env | sort` — includes injected API keys), directory listings, `~/.openclaw/openclaw.json`, `~/.openclaw/secrets.json`, SSH keys, and agent persona/knowledge files.
+### Recon
 
-**Turn 2** sweeps the agent's memory index for 16 keywords: `api_key`, `password`, `token`, `secret`, `credential`, `ssh`, `telegram`, `discord`, `webhook`, `database`, `postgres`, `mysql`, `redis`, `aws`, `openai`, `anthropic`. Returns matched snippets with source file paths and line numbers.
+Path: `payloads/recon/access_point/clawhunter/`
 
-**Turn 3** enumerates all agent sessions via `sessions_list`, then pulls the last 20 messages from each of the 5 most recent sessions — returning full conversation content across all channels.
+Consumes the selected Recon access point context, prompts for an exact SSID when Recon marks the AP hidden, maps Open/WPA/WPA2/WPA3 to the current `WIFI_CONNECT` values, pins the selected BSSID, and scans after the client interface connects. `wlan0cli` is 2.4 GHz, so 5/6 GHz selections are rejected with a clear message.
 
-**Turn 4** enumerates every device paired to the gateway via `nodes action=status` and `action=describe` — phones, tablets, cameras — with names, types, capabilities, and last-seen timestamps.
+### Alert
 
-**Turn 5 (optional)** uses `exec` to `curl` the harvested summary from the victim system directly to the attacker's Telegram bot or webhook. Data flows victim → attacker endpoint independently of the Pager.
+Path: `payloads/alerts/pineapple_client_connected/clawhunter-watchdog/`
 
-### Token-gated portals
+Runs silently when a Pineapple client connects. It resolves that exact client's IP with `FIND_CLIENT_IP` and an exact-MAC ARP fallback, then performs a short evidence probe without selecting an unrelated ARP entry.
 
-If the target requires a bearer token, only Phases 1 and 2 run. No agent session is attempted. The HTTP harvest still yields canvas content, a2ui content, agent status JSON (if reachable), and response headers.
+### Mode comparison
 
-### Exit codes
+| Capability | Interactive | Recon | Alert |
+| --- | ---: | ---: | ---: |
+| Operator selects target IPv4 /24 | Yes | Automatic from DHCP | No |
+| Connects to selected AP | No | Yes | No |
+| mDNS observation | Timed | Short pre-scan | No |
+| ARP/ping host discovery | Yes | Yes | Exact client only |
+| Sequential scan | Yes | Yes | One host/port |
+| Parallel scan | Fast/Aggressive | No | No |
+| JSON report | Yes | Yes | No |
+| Results browser | Yes | Yes | No |
+| Assessment engine | From confirmed result | From confirmed result | No |
+| Audio | Operator/profile controlled | Enabled | Never |
+| Execution target | Active routed network | Selected 2.4 GHz AP | Triggering client |
 
-| Code | Meaning |
-|------|---------|
-| 0 | Harvest complete — agent session data collected |
-| 1 | Token-gated — HTTP harvest only, no agent access |
-| 2 | Unreachable — target went offline |
-| 3 | Unexpected error (check log for details) |
+## Interactive Workflow
 
----
+1. Launch CLAWHunter from **Payloads > User > Reconnaissance**.
+2. Choose whether to suppress audio and vibration.
+3. Optionally randomize the active scanner interface MAC for the duration of the payload. The original MAC is restored by the exit trap.
+4. Select `GHOST`, `QUIET`, `NORMAL`, `FAST`, or `AGGRESSIVE`.
+5. Confirm the full target IPv4 address. The scanner derives that address's /24 prefix.
+6. Confirm the primary OpenClaw port. The default is 18789.
+7. For non-Aggressive profiles, optionally enable the 18780-18800 range, extended web ports, and randomized host order.
+8. Choose a quick `.1-.50` or full `.1-.254` host range.
+9. Set the mDNS dwell when `avahi-browse` is available.
+10. Review confirmed results, optionally launch an authorized assessment with RIGHT, and optionally start watchdog mode.
 
-## Hardware features
+### Controls
 
-| Hardware | Usage |
-|----------|-------|
-| **480×222 px 16-bit color display** | Color-coded LOG output, interactive pickers, profile selector, ALERT popups, results browser, history browser, mDNS countdown, watchdog countdown |
-| **RGB LED array (4 LEDs)** | Blue = scanning, fast green = confirmed, alternating = candidate, cyan = mDNS/passive, white = WiFi connecting, magenta = watchdog sleeping, red = error |
-| **Haptic (vibration)** | Soft (150ms) on candidate, medium (300ms) on mDNS/WiFi, strong (500ms) on confirmed find, harvest complete, and scan complete; alert variant uses vibrate-only (SILENT forced) |
-| **Audio (RINGTONE / RTTTL)** | Startup, find, mDNS find, candidate ping, complete ok/none, abort, WiFi connected, watchdog alert — all suppressed in silent mode |
-| **5-button navigation** | UP/DOWN for pickers and profile selection; B to abort scan, exit browsers, exit watchdog; RIGHT to trigger harvest from results browser |
+| Context | Control | Action |
+| --- | --- | --- |
+| Profile selection | UP / DOWN | Change profile |
+| Profile selection | B | Confirm highlighted profile |
+| Active scan | B | Abort and preserve completed-host checkpoint |
+| Results/history | UP / DOWN | Navigate confirmed endpoints |
+| Results | RIGHT | Run bounded assessment for selected endpoint |
+| Results/history | B or LEFT | Exit browser |
+| Dialogs/pickers | Pager theme controls | Confirm, reject, or cancel through Hak5 UI components |
 
----
+The user payload scans the current routed network. Connecting to a Recon-selected access point is intentionally isolated in the Recon payload so interactive mode does not duplicate AP state, encryption mapping, or credential handling.
 
-## Display behavior
+## Detection
 
-**During scan:**
+The default OpenClaw gateway port is `18789`. Port `18790` remains available as a legacy compatibility probe.
 
-```
-  ✦ CLAWHunter v3.1.0       ← blue header
-  OpenClaw Discovery Suite
-  mDNS monitoring (30s)...   ← cyan
-  mDNS: 25s remaining...
-  Checking ARP cache...      ← blue
-  Cache: 3 host(s) pre-known
-  Discovering hosts...       ← blue
-  Live hosts: 47
-  12% — 192.168.4.6 (6/47)   ← blue (progress)
-  ? Open: 192.168.4.50:18790  ← blue (candidate)
-  ✦ FOUND: 192.168.4.100:18790 (http)        ← green
-    HTTP 401 — token-gated gateway
-    Model: claude-opus-4-6 | Ctx: 44%        ← /agent/status intel
-```
+The shared classifier combines:
 
-**Profile selector:**
+- exact `_openclaw-gw._tcp` mDNS discovery, treated as an unauthenticated hint;
+- TCP reachability;
+- HTTP and HTTPS root evidence;
+- `x-openclaw` headers or OpenClaw body markers;
+- `/healthz` and `/readyz` responses;
+- a WebSocket upgrade and the OpenClaw-specific `connect.challenge` event;
+- legacy canvas paths as low-weight compatibility evidence.
 
-```
-  Profile: NORMAL            ← green
-    Sequential probes, default behavior
-    UP/DOWN=change  B=confirm
-```
+`CONFIRMED` requires OpenClaw-specific evidence. A generic 401/403 response, generic health endpoint, or generic WebSocket upgrade cannot confirm a gateway by itself.
 
-**Results browser:**
+### Evidence model
 
-```
-  Find 1/1                   ← green
-    192.168.4.100            ← green
-    port: 18790              ← blue
-    http:// | HTTP 401 | Model: claude-opus-4-6
-    UP/DOWN=nav  B=done  >=harvest
-```
+| Signal | Score | OpenClaw-specific? | Notes |
+| --- | ---: | ---: | --- |
+| Any HTTP/S response | 1 | No | Establishes an HTTP transport only |
+| `/healthz` returns 200 | 1 | No | Common endpoint shape; not confirmation |
+| `/readyz` returns 200 | 1 | No | Common endpoint shape; not confirmation |
+| Generic WebSocket upgrade | 1 | No | Many unrelated services upgrade |
+| Non-404 legacy canvas path | 1 | No | Compatibility hint only |
+| `x-openclaw` response header | 4 | Yes | Product-specific marker |
+| OpenClaw/clawd root body marker | 4 | Yes | Product-specific marker |
+| OpenClaw/clawd health body marker | 3 | Yes | Product-specific health evidence |
+| `connect.challenge` event | 5 | Yes | Current gateway protocol evidence |
 
-**Watchdog sleeping:**
+Classification rules:
 
-```
-  Watchdog: next scan in 240s  ← magenta LED pulsing
-  B to exit watchdog
-```
+- `CONFIRMED`: score 4 or higher and at least one OpenClaw-specific signal.
+- `LIKELY`: score 3 or higher without specific confirmation.
+- `CANDIDATE`: reachable endpoint with weaker evidence.
+- `NONE`: no classifiable HTTP/S transport or invalid/unreachable target.
 
----
+Every classification records its score and evidence string in the scan log. mDNS results are logged as hints and do not increment the confirmed finding count until active evidence validates the endpoint.
 
-## LED states
+### Port behavior
 
-| State | Pattern | Color |
-|-------|---------|-------|
-| Scanning / probing | Slow pulse 600ms/400ms | Blue |
-| Passive mDNS monitor | Slow pulse 800ms/600ms | Cyan |
-| Candidate port open | Alternating 250ms | Blue ↔ Green |
-| mDNS confirmed find | Double-flash, LEDs 1+2 | Cyan |
-| Confirmed OpenClaw | Fast flash 120ms | Green |
-| WiFi connecting | Slow pulse 500ms/300ms | White |
-| Watchdog sleeping | Slow pulse 1000ms/800ms | Magenta |
-| Error / abort | Solid 5s | Red |
-| Scan complete — found | Slow pulse 700ms/500ms | Green |
-| Scan complete — none | Slow pulse 700ms/500ms | Blue |
-| Exiting / off | Off | — |
+| Port set | Contents | Use |
+| --- | --- | --- |
+| Default | Operator port plus 18790 legacy | Normal targeted scan |
+| Wide | 18780 through 18800 | Aggressive/range discovery |
+| Extended | 80, 443, 3000, 8080, 8443 | Reverse proxy or alternate web binding checks |
+| Alert | 18789 only | Keeps event handling within the short budget |
 
----
+All IP addresses and ports are validated before reaching `nc` or `curl`. HTTP bodies are capped at 8 KiB in the shell classifier; headers are capped at 4 KiB.
 
-## Port reference
+## Scan Profiles
 
-| Port | Description |
-|------|-------------|
-| `18790` | OpenClaw agent/gateway default (primary scan target) |
-| `18789` | OpenClaw control-plane WebSocket (probed on confirmed HTTP finds via Stage 5 WS upgrade) |
-| `18780–18800` | Wide port range (non-default and custom configs) |
-| `80, 443` | Common reverse proxy front-ends |
-| `3000, 8080, 8443` | Common dev/alt proxy ports |
+| Profile | Active workers | Timing | Audio/haptic | Port behavior |
+| --- | ---: | --- | --- | --- |
+| Ghost | 0 | mDNS dwell only | Operator setting | No active port probes; ARP cache summary only |
+| Quiet | 1 | 50-250 ms between hosts | Forced silent | Selected/default ports |
+| Normal | 1 | 0-80 ms variation | Operator setting | Selected/default ports |
+| Fast | 3 | 0-25 ms variation | Operator setting | Selected/default ports |
+| Aggressive | 5 | No added delay | Operator setting | 18780-18800 plus extended ports |
 
-> **Note:** OpenClaw binds to `127.0.0.1` (loopback) by default. CLAWHunter finds instances where `gateway.bind` has been changed to a LAN interface, or those running behind a reverse proxy — exactly the configurations that are exposed at network level.
+Sequential and parallel paths share the same checkpoint contract. A host is recorded only after all selected ports finish, and checkpoint identity includes the subnet and port set.
 
----
+## Checkpoints and Parallelism
 
-## External tools & fallbacks
+Interactive checkpoints use:
 
-| Tool | Used for | Default on Pager? | Fallback |
-|------|----------|------------------|---------|
-| `nc` | TCP probe, WS fallback | ✅ Yes | — |
-| `curl` | HTTP fingerprinting | ✅ Yes | — |
-| `awk` | Shuffle, field extract | ✅ Yes (busybox) | — |
-| `arping` | L2 host discovery | ✅ Usually | ping sweep |
-| `arp-scan` | L2 host discovery | ❌ No | arping → ping |
-| `avahi-browse` | mDNS discovery | ❌ No | skipped gracefully |
-| `macchanger` | MAC randomization | ❌ No | `ip link` method |
-| `python3` | Harvest module | ❌ No | `opkg install -d mmc python3` |
-
----
-
-## Log & report output
-
-### Scan text log
-
-```
-/root/loot/clawhunter/scan_YYYYMMDD_HHMMSS.log   ← user + recon payloads
-/root/loot/clawhunter/alert_YYYYMMDD_HHMMSS.log  ← alert variant
-/root/loot/clawhunter/harvest_<IP>_<YYYYMMDD_HHMMSS>.log  ← harvest module
+```text
+/tmp/clawhunter_checkpoint_<subnet>_<port-key>
 ```
 
-**Sample scan log:**
+The `port-key` is a checksum of the normalized selected port list. This prevents a completed quick scan from being treated as completed when the operator later selects a different port set.
 
-```
-==================================================
-  CLAWHunter v3.1.0 — OpenClaw Discovery
-  Hak5 WiFi Pineapple Pager
-==================================================
-Scan ID        : 20260307_143512
-Date/Time      : Sat Mar  7 14:35:12 UTC 2026
-Scanner IP     : 10.0.0.150
-Subnet         : 10.0.0.1-254
-Port(s)        : 18790
-Wide range     : NO
-Extended ports : NO
-Randomized     : YES
-Silent mode    : NO
-Scan profile   : NORMAL
-MAC randomized : YES
-ARP available  : YES
-avahi available: YES
-==================================================
+Sequential behavior:
 
-── mDNS MONITOR (30s) ──
-[MDNS]      10.0.0.100 via mDNS | record: _openclaw._tcp ...
+1. Skip hosts already present in the current checkpoint.
+2. Probe every selected port for one host.
+3. Record confirmed and candidate endpoints.
+4. Append the host only after its full port loop completes.
 
-── PORT SCAN ──
-[14:35:44] C2: ARP cache harvest: 3 host(s) pre-known
-[14:35:46] Probing: 10.0.0.100 (12/47, 25%)
-[FOUND]     10.0.0.100:18790 | http | HTTP 401 | token-gated gateway
-[14:35:46]   A1: WebSocket upgrade accepted — protocol-layer confirmed
-[14:35:46]   A2: canvas path HTTP 200 — OpenClaw-unique path confirmed
-[14:35:47]   A3: model=anthropic/claude-opus-4-6 ctx=44.5% tools=2 subagents=1
-[14:35:47]   Detail: Version: 2026.3.2 | Persona: assistant | Model: anthropic/claude-opus-4-6 | Ctx: 44.5%
+Parallel behavior:
 
-── DIFF vs PREVIOUS SCANS ──
-  New instances : 1
-  Gone instances: 0
+1. Filter checkpointed hosts before launching workers.
+2. Give each worker a private result file under a secure `mktemp -d` directory.
+3. Write every endpoint record, then one `DONE` record after the full port loop.
+4. Let the parent process update UI, hardware, global result arrays, logs, and checkpoints.
 
-==================================================
-SUMMARY
-  Hosts scanned  : 47
-  OpenClaw found : 1
-  Elapsed        : 95s
-  Status         : COMPLETE
+An operator abort preserves completed-host records. Clean completion removes the checkpoint. The architecture avoids background workers mutating parent Bash arrays, which would otherwise be lost across subshell boundaries.
 
-  DISCOVERED INSTANCES:
-    ✦ 10.0.0.100:18790
-==================================================
-  Log : /root/loot/clawhunter/scan_20260307_143512.log
-  JSON: /root/loot/clawhunter/scan_20260307_143512.json
-==================================================
+## Hardware Feedback
+
+| State | Display/log | LEDs | Haptic/audio |
+| --- | --- | --- | --- |
+| Scanning | Host, progress, profile | Blue pulse | Profile/operator dependent |
+| Confirmed OpenClaw | Endpoint and evidence | Green pulse | Strong vibration and found ringtone |
+| Likely/candidate | Endpoint and class | Alternating blue/green | Soft vibration and short tone |
+| mDNS hint | Resolved endpoint | Cyan pattern | Medium vibration and mDNS tone |
+| WiFi connect | Selected SSID/BSSID | White pulse | Success vibration/ringtone |
+| Watchdog | Run/change status | Magenta pulse | Alert pattern on change |
+| Error | Error dialog/log | Solid red | Context dependent |
+| Alert confirmed | Local alert log only | Green, then off | Strong vibration; no audio |
+| Alert candidate | Local alert log only | Candidate pattern, then off | Soft vibration; no audio |
+
+Missing hardware helpers are non-fatal in `lib/common.sh`: a feedback failure must not terminate discovery or corrupt loot. Haptic helpers pass complete RTTTL note patterns to the Pager's `VIBRATE` command. Quiet mode suppresses shared audio/haptic wrappers. The event-triggered alert never plays audio and does not open blocking dialogs.
+
+## Assessment Engine
+
+`harvest.py` is a Python standard-library-only, 180-second-bounded assessment client. It records root, liveness, readiness, and WebSocket challenge evidence. When an authorized gateway token or password is supplied, it calls only `sessions_list` and `memory_search` through the current `/tools/invoke` API.
+
+The gateway secret is never passed on the command line. Set it in the environment or place one line in `/root/.config/clawhunter/gateway-token` with restrictive permissions:
+
+```bash
+mkdir -p /root/.config/clawhunter
+chmod 700 /root/.config/clawhunter
+printf '%s\n' 'authorized-gateway-secret' > /root/.config/clawhunter/gateway-token
+chmod 600 /root/.config/clawhunter/gateway-token
 ```
 
-### JSON report
+OpenClaw treats this shared secret as full operator authority. Protect it accordingly. Without a credential, authentication-required targets are reported without bypass attempts. The obsolete unauthenticated agent-command and out-of-band exfiltration behavior is not present in v3.3.0.
+
+### Assessment phases
+
+1. Validate the IPv4 target and TCP port.
+2. Discover HTTP or HTTPS from the root response.
+3. Record root status, `x-openclaw` marker evidence, `/healthz`, and `/readyz`.
+4. For HTTP, validate `Sec-WebSocket-Accept` and capture the first gateway event.
+5. Record `connect.challenge` without forging an Ed25519 device identity or pairing request.
+6. Call `sessions_list`; stop on 401/403 or rate limiting.
+7. Call `memory_search` only when policy/authentication allowed the first read.
+8. Write a JSON report even when the global deadline returns partial evidence.
+
+The direct `/tools/invoke` allowlist is literal in code. Target responses and command-line input cannot select a different tool. Policy denials and unavailable tools are recorded and are not bypassed.
+
+### Direct CLI use
+
+```bash
+OPENCLAW_GATEWAY_TOKEN='authorized-gateway-secret' \
+python3 payloads/user/reconnaissance/clawhunter/harvest.py \
+  --ip 192.0.2.10 \
+  --port 18789 \
+  --out /tmp/clawhunter-assessment.json \
+  --timeout 180
+```
+
+`--timeout` is clamped to 1-180 seconds. `--legacy-protocol` performs one additional upgrade/challenge observation only; it never sends legacy agent commands.
+
+| Exit | Meaning |
+| ---: | --- |
+| 0 | Assessed, including a useful partial report after deadline |
+| 1 | Gateway authentication required or rejected |
+| 2 | Target unreachable before a transport was established |
+| 3 | Invalid/incomplete local execution or report-write failure |
+
+## Output
+
+Runtime output is written under `/root/loot/clawhunter/`:
+
+```text
+scan_YYYYMMDD_HHMMSS.log
+scan_YYYYMMDD_HHMMSS.json
+alert_YYYYMMDD_HHMMSS.log
+harvest_IP_YYYYMMDD_HHMMSS.log
+watchdog_state.json
+```
+
+Confirmed instances include their scheme, port, evidence class, confidence score, and evidence summary. mDNS and IPv6 hints are recorded separately from confirmed findings.
+
+### Scan JSON shape
 
 ```json
 {
-  "scan_id": "20260307_143512",
-  "payload_version": "3.1.0",
-  "subnet": "10.0.0.1-254",
-  "hosts_scanned": 47,
-  "elapsed_seconds": 95,
-  "timestamp": "2026-03-07T14:37:47Z",
+  "scan_id": "20260806_120000",
+  "payload_version": "3.3.0",
+  "subnet": "192.0.2.1-254",
+  "hosts_scanned": 12,
+  "elapsed_seconds": 34,
+  "timestamp": "2026-08-06T16:00:34Z",
   "instances": [
     {
-      "ip": "10.0.0.100",
-      "port": "18790",
-      "detail": "http:// | HTTP 401 — token-gated gateway | Version: 2026.3.2 | Persona: assistant | Model: anthropic/claude-opus-4-6 | Ctx: 44.5% | Canvas: confirmed | WS: confirmed",
-      "fingerprint": {
-        "version": "2026.3.2",
-        "persona": "assistant",
-        "model": "anthropic/claude-opus-4-6",
-        "context_percent": "44.5%",
-        "canvas_confirmed": "confirmed",
-        "websocket_confirmed": "confirmed"
-      }
+      "ip": "192.0.2.10",
+      "port": 18789,
+      "detail": "http:// | OpenClaw Gateway | Class: CONFIRMED|Confidence: 11|Evidence: ..."
     }
   ]
 }
 ```
 
----
+Only confirmed instances appear in `instances`. Candidate, mDNS, IPv6, and per-path evidence remains in the text log. Assessment reports are separate JSON documents containing transport, health, WebSocket, tool-policy/authentication, elapsed-time, and partial-error fields.
+
+### History, diff, and watchdog state
+
+- History extracts confirmed endpoint strings from prior scan logs and de-duplicates them.
+- Diff compares the current confirmed set with older logs and records new/gone counts.
+- Watchdog persists its baseline to `watchdog_state.json` so a payload restart does not reclassify every known endpoint as new.
+- Historical files are read-only inputs; CLAWHunter does not rewrite older scan reports.
+
+## Dependency Fallbacks
+
+| Capability | Preferred | Fallback | Degraded behavior |
+| --- | --- | --- | --- |
+| mDNS | `avahi-browse` from `avahi-utils` | None | Active scanning continues; Ghost reports limited mode |
+| Layer 2 discovery | `arp-scan` | `arping`, then BusyBox `ping` | Slower host discovery |
+| TCP/WS probe | `nc` | None | Endpoint cannot be actively classified |
+| HTTP/S evidence | `curl` | None | Endpoint cannot be actively classified |
+| Assessment | `python3` on eMMC | None | Discovery/results work; RIGHT reports Python requirement |
+| MAC randomization | `macchanger` | `ip link` generated unicast MAC | Same restore trap remains active |
+| Pager hardware API | Hak5 command helpers | Non-fatal no-op wrappers | Logs/reports continue without feedback |
+
+The runtime intentionally avoids `jq`, third-party Python packages, `grep -P`, `shuf`, and predictable `mktemp -u` paths.
 
 ## Troubleshooting
 
-### `harvest.py` not found / harvest doesn't launch
-Verify `harvest.py` is deployed at exactly `/root/payloads/user/clawhunter/harvest.py`. The path is hardcoded in `lib/common.sh`. The user payload's directory structure on the Pager must match the layout in the [Deploy](#prerequisites--deploy) section.
+### Payload does not appear in Pager Portal
 
-### `python3: not found` error at harvest launch
-Install python3 to the MMC partition:
+- Confirm firmware 1.1.0 or newer.
+- Confirm the exact category directory and executable `payload.sh` permissions.
+- Re-run `scripts/install-pager.sh`; it creates all three current category paths.
+- Confirm a local `common.sh` exists beside each installed payload when deploying a release bundle.
+
+### Recon cannot connect
+
+- Confirm the selected AP is 2.4 GHz; `wlan0cli` cannot join 5/6 GHz APs.
+- Confirm the Recon context includes SSID, encryption type, and BSSID.
+- Re-enter the passphrase. CLAWHunter does not persist it.
+- Check whether DHCP assigned an IPv4 address to `wlan0cli` within 30 seconds.
+- Open networks pass `NONE`; WPA, WPA2, and WPA3 map to `psk`, `psk2`, and `sae`.
+
+### Alert produces only a skipped log
+
+- DHCP or ARP may not have resolved the triggering client yet.
+- Confirm `_ALERT_CLIENT_CONNECTED_CLIENT_MAC_ADDRESS` is present and valid.
+- Check `/proc/net/arp` for that exact MAC. CLAWHunter will not probe a different client as a fallback.
+- Firmware 1.1.0 is recommended because it includes monitor-interface stability work.
+
+### No mDNS hints
+
+- Install `avahi-utils` to eMMC and confirm `/mmc/usr/bin` is present.
+- Confirm the gateway advertises `_openclaw-gw._tcp` on the same multicast domain.
+- OpenClaw may have Bonjour disabled or may bind only to loopback/tailnet.
+- Continue with active scanning; mDNS is a hint source, not a requirement.
+
+### Generic service reported as a candidate
+
+This is intentional. A reachable HTTP service, health endpoint, 401/403 response, or generic WebSocket upgrade lacks product-specific evidence. Inspect `Class`, `Confidence`, and `Evidence` in the text log before manual follow-up.
+
+### Assessment says authentication required
+
+- v3.3.0 does not guess or bypass credentials.
+- Provide an explicitly authorized gateway secret through the protected file or environment.
+- Treat the secret as full gateway operator authority.
+- A 404 or `UNAVAILABLE` tool result may reflect OpenClaw tool policy rather than network failure.
+
+### Python installed but not found
+
+- Install it with `opkg install -d mmc python3`.
+- Confirm `/mmc/usr/bin/python3` exists.
+- Run `lib/common.sh` environment bootstrapping through the payload rather than invoking an incomplete copied file.
+- Check `/mmc/usr/lib` when the interpreter reports missing shared libraries.
+
+## Development and Release
+
+Run the complete host-side gate:
+
 ```bash
-opkg update && opkg install -d mmc python3
+scripts/check.sh
 ```
 
-### `opkg update` fails — no internet
-The Pager needs internet access to reach the OpenWRT package repository. Connect the Pager's management interface to an internet-connected network before running `opkg`.
+It runs Bash syntax checks, ShellCheck at warning severity, Python byte-compilation, shell and Python unit tests, version-unity validation, and reproducible-package verification. Build the release archive with:
 
-### `lib/common.sh: not found` on Pager
-The shared library must be at `/root/payloads/lib/common.sh`. Each payload sources it with a relative `../../lib/common.sh` path — if the directory structure is wrong the payload will fail immediately on launch. Re-deploy using the rsync command in the [Deploy](#prerequisites--deploy) section.
+```bash
+scripts/package-release.sh
+```
 
-### mDNS monitor never finds anything
-`avahi-browse` is not installed by default. Either install it (`opkg install -d mmc avahi-utils`) or press **B** during the mDNS countdown to skip it and proceed directly to the port sweep.
+Host checks do not replace validation on a physical Pager. See [CONTRIBUTING.md](CONTRIBUTING.md) and [the v3.3 research record](docs/V3.3-RESEARCH.md).
 
-### MAC randomization fails silently
-The Pager may not have `macchanger` installed. `lib/common.sh` falls back to `ip link set dev <iface> address <mac>` automatically. If both fail, the scan proceeds with the real MAC and a warning is logged.
+### Gate coverage
 
-### WiFi client mode — cannot connect to encrypted AP
-`TEXT_PICKER` exists in DuckyScript but is character-by-character via physical buttons — impractical for passwords. Pre-save the AP credentials in the Pager's WiFi Settings before launching the payload. If credentials are not saved, the connection attempt will fail and the payload will log a notice and exit.
+- Bash syntax for shared library, all payloads, installer, packager, and shell tests.
+- ShellCheck warnings across the same files.
+- Python byte-compilation for `harvest.py` and its unit test.
+- Strict IPv4/port validation and JSON escaping fixture checks.
+- False-positive regression: generic 401 plus generic WebSocket stays `CANDIDATE`.
+- Positive regression: OpenClaw markers plus `connect.challenge` become `CONFIRMED`.
+- Exact avahi semicolon-record parsing.
+- Standard and extended WebSocket frame decoding.
+- `/tools/invoke` authentication-stop behavior.
+- One unified runtime version across five load-bearing files.
+- Two independent release builds compare byte-for-byte.
+- Archive contains local payload resources.
+- Installer stages byte-identical libraries in every category path.
 
-### Harvest hangs / no output
-The victim gateway may be slow or the session may have stalled. The harvest engine enforces per-turn timeouts (20–60s) and a 3-minute global session ceiling. If it's still running past 3 minutes, check `/root/loot/clawhunter/harvest_*.log` for partial output.
+### Physical Pager release checks
 
-### Scan finds nothing on a subnet where OpenClaw is known to exist
-OpenClaw binds to `127.0.0.1` (loopback) by default. CLAWHunter can only find instances where the gateway has been configured to bind to a LAN interface (`gateway.bind` in `openclaw.json`) or is behind a reverse proxy. Confirm the target's bind address before scanning.
+Host automation cannot validate RF conditions or physical UI behavior. Before promoting a later release, record:
 
----
+- Pager firmware version;
+- Portal discovery of all three payloads;
+- user-mode picker/dialog rendering;
+- Recon connection to open, WPA2, and WPA3 2.4 GHz fixtures where available;
+- alert event variable delivery and exact client resolution;
+- LED, haptic, audio, spinner, and button behavior;
+- eMMC Python discovery;
+- clean and aborted checkpoint behavior;
+- loot/report retrieval through Pager Portal.
 
-## Further reading
+### Release artifact properties
 
-Protocol research, feature specifications, and stretch goals: [`docs/V3-RESEARCH.md`](docs/V3-RESEARCH.md)
+`scripts/package-release.sh` normalizes archive entry order, modification time, numeric owner/group, and gzip timestamp. The quality gate builds twice in independent temporary directories and requires byte equality. It also dry-runs the installer into a temporary payload root and compares every embedded `common.sh` to the canonical library.
 
-For full version details with dates and breaking changes: [`CHANGELOG.md`](CHANGELOG.md)
+## Research Sources
 
----
-
-## Version history
-
-| Version | Changes |
-|---------|---------|
-| **v3.2.0** | IPv6 link-local neighbor harvest (`fe80::/10`) via `ip -6 neigh` — logged as candidates. Scan resume/checkpoint for sequential and parallel paths. Global 3-minute harvest session ceiling. Watchdog state persistence across reboots (`watchdog_state.json`). Fixed IPv6/IPv4 sort collision in `arp_cache_harvest()`. |
-| **v3.1.0** | Multi-turn agent session (5 turns, single persistent WS connection). Agent-native tool exploitation: `memory_search`, `sessions_list`, `sessions_history`, `nodes`. Out-of-band exfil via Telegram bot or webhook (Turn 5, optional). Improved streaming parser handles all `event.payload` shapes and all terminal `res` statuses. |
-| **v3.0.3** | Per-profile timing dither (`$RANDOM`-based, busybox-compatible) for two-axis IDS evasion. Dead `hashlib` import removed from `harvest.py`. |
-| **v3.0.2** | Integrated harvest module (`harvest.py`): stdlib-only Python3, three-phase (auth probe → HTTP harvest → multi-turn agent session). Triggered from results browser with RIGHT key. |
-| **v3.0.1** | OpenWRT/busybox compatibility: `grep -oP` → `awk`, `shuf` → awk PRNG, `/dev/tcp` + `nc` fallback, `TEXT_PICKER` replaced with instructional messages (character-by-character button input is impractical for passwords/tokens). |
-| **v3.0.0** | Three-payload suite (`user` / `recon` / `alert`) with shared `lib/common.sh`. WebSocket upgrade probe (~99% accuracy). Canvas path probe (`/__openclaw__/canvas/`, `/__openclaw__/a2ui/`). `/agent/status` intel extraction. Continuous mDNS monitor with countdown. ARP cache pre-harvest. JSON report output. MAC randomization. GHOST/QUIET/NORMAL/FAST/AGGRESSIVE scan profiles. Watchdog mode. |
-| **v2.1.0** | Silent mode, progress counter, ARP L2 discovery, randomized scan order, HTTPS probe, extended ports (80/443/3000/8080/8443), mDNS pre-scan, deep fingerprinting, WiFi client mode, multi-subnet sweep, cross-run history/diff. |
-| **v1.0.0** | Initial release — ARP discovery, port probe, basic hardware feedback. |
-
----
+- [Hak5 WiFi Pineapple Pager documentation](https://documentation.hak5.org/wifi-pineapple-pager)
+- [Hak5 Pager firmware downloads and changelogs](https://downloads.hak5.org/pineapple/pager)
+- [Official Hak5 Pager Payload Library](https://github.com/hak5/wifipineapplepager-payloads)
+- [OpenClaw gateway protocol](https://docs.openclaw.ai/gateway/protocol)
+- [OpenClaw Bonjour discovery](https://docs.openclaw.ai/gateway/bonjour)
+- [OpenClaw tools invoke API](https://docs.openclaw.ai/gateway/tools-invoke-http-api)
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+See [LICENSE](LICENSE).

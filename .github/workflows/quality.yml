@@ -1,0 +1,26 @@
+name: Quality
+
+# Keep the repository gate identical to the command contributors run locally.
+# The workflow installs only ShellCheck; all payload Python remains stdlib-only.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-checks:
+    # Ubuntu provides GNU tar/gzip used by the reproducibility assertion and
+    # permits the loopback-only HTTP/WebSocket integration fixture.
+    runs-on: ubuntu-latest
+    steps:
+      # Pin the major official action; repository contents are read-only here.
+      - uses: actions/checkout@v4
+      - name: Install ShellCheck
+        # ShellCheck is the only package absent from the runner image that the
+        # gate requires. Payload Python remains standard-library-only.
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Run quality gate
+        # Keep CI and contributor/release validation on one maintained command.
+        run: scripts/check.sh

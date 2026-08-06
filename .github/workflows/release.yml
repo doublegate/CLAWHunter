@@ -1,0 +1,71 @@
+name: Release
+
+# Release artifacts are built from the immutable tag, never from a developer's
+# local dist directory. The manual trigger is a recovery path and still requires
+# an existing tag; it refuses to replace an already published version.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing semantic-version tag to release
+        required: true
+        type: string
+
+# `contents: write` is limited to this workflow because `gh release create`
+# needs to publish the archive/checksum against the triggering tag.
+permissions:
+  contents: write
+
+jobs:
+  package-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      # Push uses ref_name; manual recovery uses the explicitly supplied tag.
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          # A manual run must build the tag rather than the current default head.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Install release gate dependency
+        # Payload Python remains standard-library-only; ShellCheck is the sole
+        # additional host package needed by the same gate used on pull requests.
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Validate tag and release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(sed -nE 's/^VERSION=([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' scripts/package-release.sh)
+          test "$RELEASE_TAG" = "v$version"
+          scripts/check.sh
+
+      - name: Build reproducible Pager assets
+        # package-release.sh emits the archive and its adjacent SHA256 checksum;
+        # scripts/check.sh already verified deterministic double-build output.
+        run: scripts/package-release.sh dist
+
+      - name: Publish immutable GitHub release
+        # Refuse replacement instead of silently changing assets under a
+        # version users may already have verified by checksum.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to overwrite it" >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/clawhunter-v*-pager.tar.gz \
+            dist/clawhunter-v*-pager.tar.gz.sha256 \
+            --verify-tag \
+            --title "CLAWHunter $RELEASE_TAG" \
+            --notes-file docs/V3.3-RELEASE-NOTES.md

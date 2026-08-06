@@ -4,6 +4,52 @@ All notable changes to CLAWHunter are documented here.
 
 ---
 
+## [v3.3.0] - 2026-08-06
+
+### Release engineering
+- Added one deterministic release gate covering Bash syntax, ShellCheck,
+  Python compilation/unit tests, loopback HTTP/WebSocket integration, version
+  parity, checkpoint parity, two byte-identical package builds, checksums, and
+  a staged installer dry run.
+- Added a tag-driven GitHub Actions release workflow with a guarded manual
+  recovery trigger; both paths rebuild and validate the artifact from the
+  immutable release tag before publishing it.
+- Added an internal file manifest and adjacent archive checksum, and made the
+  release archive self-contained by including all documentation and images
+  referenced by its README.
+- Added detailed release notes, a PASS/FAIL/WARN evidence checklist, expanded
+  firmware/protocol research, and implementation-level rationale comments
+  throughout every generated or modified source and automation file.
+
+### Added
+- Official Payload Library-compatible category paths for user, recon, and alert payloads.
+- Evidence-scored OpenClaw classification (`CONFIRMED`, `LIKELY`, and `CANDIDATE`) with explicit evidence in logs and reports.
+- Current OpenClaw gateway checks for port 18789, `_openclaw-gw._tcp`, `/healthz`, `/readyz`, WebSocket upgrade, and `connect.challenge`.
+- Device-local installer, reproducible Pager release archive, embedded manifest, and archive checksum.
+- Host-side tests and GitHub Actions checks covering syntax, ShellCheck warnings, classifiers, mDNS parsing, JSON, harvest protocol helpers, version unity, and packaging reproducibility.
+- A local protocol fixture exercising real HTTP readiness, WebSocket challenge handling, bearer authentication, and authenticated read-only tool calls.
+- `docs/V3.3-RESEARCH.md`, recording the Hak5 firmware, official payload, OpenClaw, GitHub, and community research used for this release.
+
+### Changed
+- User payload now scans the active IPv4 network and accepts a full target IP through `IP_PICKER`; AP selection remains the recon payload's responsibility.
+- Recon payload uses the current `WIFI_CONNECT` signature, encryption names, selected BSSID, and refuses unsupported 5/6 GHz selections on `wlan0cli`.
+- Recon payload prompts for the exact SSID when current Recon context identifies a hidden access point.
+- Alert payload consumes the documented client-connected event variables and resolves only that client's IP with `FIND_CLIENT_IP` or exact-MAC ARP lookup.
+- Harvest engine now uses the current bounded HTTP and WebSocket surfaces and only invokes two read-only tools when the operator supplies an authorized gateway secret.
+- eMMC-installed binaries and libraries are discovered through `/mmc` PATH and library bootstrapping.
+- Checkpoint names include the selected port set; sequential and parallel paths mark a host only after all its ports finish.
+- IPv6 link-local neighbors remain separate, logged candidates and never enter the IPv4 scan/sort path.
+- Periodic watchdog scans suppress per-target display/audio/browser output and surface only changes to the detected gateway set.
+- Recon mDNS candidates are retained in the scan log instead of being erased when the post-association result file is initialized.
+
+### Fixed
+- Removed generic HTTP 401/403 and generic WebSocket upgrades as false-positive confirmation signals.
+- Removed the obsolete unauthenticated agent-turn protocol, credential prompts, and out-of-band exfiltration flow.
+- Eliminated unsafe command interpolation and predictable temporary paths in probes.
+- Corrected the legacy 18790 default to the current OpenClaw gateway default, 18789, while retaining 18790 as an optional legacy probe.
+- Unified all runtime version declarations at 3.3.0.
+- Replaced obsolete numeric `VIBRATE` arguments with documented RTTTL haptic patterns in shared and alert feedback paths.
+
 ## [v3.2.0] — 2026-03-07
 
 ### Added
