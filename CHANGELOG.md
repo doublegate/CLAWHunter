@@ -24,16 +24,14 @@ fails immediately when launched from the device.
   `PAYLOAD_HOME`, `PWD`, and finally `dirname "$0"`, taking the first candidate
   that actually holds payload resources, with `/root/payloads/lib/common.sh` as
   an absolute last resort. Manual, Portal, and repository layouts still work.
-- **Local IPv4 and interface detection did not work on the Pager.** The payloads
-  used `ip route get 1.1.1.1` and `ip -4 -o addr show`, but the device ships
-  BusyBox's `ip`, which supports neither `route get` nor `-4` — its own usage
-  lists only `route list|flush|add|del|change|append|replace|test` and the
-  options `-f family` and `-o oneline`. Both calls therefore returned nothing on
-  device and the target picker silently defaulted to `192.168.1.1` instead of
-  the network the Pager was actually on. Detection now lives in
-  `detect_local_ipv4` and `detect_default_iface` in `lib/common.sh`, which try
-  the full-iproute2 form first, then BusyBox-compatible `ip -o -f inet` and
-  `ip route` parsing, then `ifconfig`.
+- Centralised local address and interface detection into `detect_local_ipv4` and
+  `detect_default_iface` in `lib/common.sh`, replacing the same `ip route get` /
+  `ip -4 -o addr show` pair duplicated across two payloads. Each helper tries
+  full-iproute2 syntax, then `ip -o -f inet` and `ip route` parsing, then
+  `ifconfig`, and every candidate is validated before use. This is defensive
+  hardening, not a bug fix: the previous code was verified working on a Pager
+  (BusyBox 1.36.1 `ip` implements both `route get` and `-4`, and the existing
+  fallback already resolved the correct address when no default route exists).
 - **A rejected picker value looped forever.** The IPv4 and port pickers ended an
   invalid value with an unbounded `continue`, redrawing the error dialog with no
   exit. On a device whose only surface is the screen that is indistinguishable
