@@ -408,7 +408,33 @@ def main() -> int:
     output = Path(args.out).expanduser().resolve()
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(render_report(report), encoding="utf-8")
+        # The report names third-party hosts and the evidence gathered from them.
+        # payload.sh sets umask 077 before invoking this engine, but README
+        # documents running it directly, so do not rely on the caller's umask.
+        #
+        # Write to a fresh 0600 file and rename over the destination rather than
+        # opening the destination directly. O_CREAT's mode applies only when the
+        # file is created, so a report left by an earlier run would be opened at
+        # its existing mode and hold the evidence at that mode for the whole
+        # write, with a chmod afterwards closing the door too late. O_EXCL keeps
+        # this from adopting a stale temp file, and the rename is atomic, so a
+        # crash mid-write leaves the previous report intact instead of truncated.
+        tmp = output.with_name(output.name + ".tmp")
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            handle = os.fdopen(fd, "w", encoding="utf-8")
+        except BaseException:
+            # fdopen did not take ownership, so this descriptor is still ours.
+            os.close(fd)
+            raise
+        with handle as fh:
+            fh.write(render_report(report))
+        # Replace preserves the temp file's 0600; the destination inode is gone.
+        os.replace(tmp, output)
     except OSError as exc:
         print(f"harvest.py: failed to write {output}: {exc}", file=sys.stderr)
         return 3
