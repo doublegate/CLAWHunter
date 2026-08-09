@@ -4,6 +4,29 @@ All notable changes to CLAWHunter are documented here.
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- Made release packaging reproducible across hosts. `scripts/package-release.sh`
+  generated `SHA256SUMS` with a bare `sort -z`, which honours `LC_COLLATE`, so a
+  builder on `en_US.UTF-8` emitted the manifest in a different order than a
+  C-locale CI runner and therefore a different archive hash. Every per-file hash
+  still verified, so nothing reported a problem — but rebuilding from source to
+  confirm a published checksum failed. Manifest generation now pins `LC_ALL=C`.
+  Found while verifying the published v3.3.0 archive; those assets are correct
+  and unaffected, having been built in the C locale.
+
+### Changed
+- `scripts/check.sh` now asserts the release manifest is in C-locale byte order.
+  Its existing two-build comparison runs on one host under one locale and so
+  cannot detect collation drift by construction.
+- Both CI workflows now install the gate's host tools explicitly
+  (`shellcheck`, `ripgrep`, `netcat-openbsd`, `curl`) instead of relying on the
+  runner image, so a missing tool fails at install time rather than surfacing as
+  `FAIL: loopback classifier probe failed`.
+
+---
+
 ## [v3.3.0] - 2026-08-06
 
 ### Release engineering

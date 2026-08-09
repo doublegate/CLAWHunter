@@ -41,8 +41,14 @@ done
 (
     cd "$PACKAGE_ROOT"
     # NUL delimiters make manifest generation safe for any legal file name.
+    # LC_ALL=C pins byte-value collation. `sort` otherwise honours the builder's
+    # LC_COLLATE, so an en_US.UTF-8 host orders ./docs/architecture.dot before
+    # ./docs/V3-RESEARCH.md while a C-locale host (every CI runner) does the
+    # reverse. That reorders SHA256SUMS, changes the archive bytes, and breaks
+    # independent rebuild verification of the published checksum -- while every
+    # per-file hash still verifies, so nothing else reports a problem.
     find . -type f ! -name SHA256SUMS -print0 \
-        | sort -z \
+        | LC_ALL=C sort -z \
         | xargs -0 sha256sum > SHA256SUMS
 )
 

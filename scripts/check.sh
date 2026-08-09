@@ -100,6 +100,12 @@ grep -q 'CONTRIBUTING.md' "$tmp_one/archive-contents.txt"
     tar -xzf clawhunter-v3.3.0-pager.tar.gz -C unpacked
     cd unpacked/clawhunter-v3.3.0
     sha256sum -c SHA256SUMS >/dev/null
+    # Reproducibility is cross-host, not merely twice-on-this-host: the two
+    # builds above share one locale, so they cannot detect collation drift.
+    # Assert the manifest is in C-locale byte order, which is what every CI
+    # runner produces and therefore what a downloader rebuilding the archive
+    # must be able to reproduce.
+    diff <(cut -c67- SHA256SUMS) <(cut -c67- SHA256SUMS | LC_ALL=C sort) >/dev/null
 )
 
 # A staged install verifies canonical category paths and eliminates divergence
