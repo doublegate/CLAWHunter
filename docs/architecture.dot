@@ -1,6 +1,6 @@
 digraph CLAWHunter {
     // Source-of-truth diagram for both docs/architecture.svg and the README PNG.
-    graph [rankdir=TB, bgcolor="#0d1117", fontcolor="#e6edf3", fontname="Helvetica", label="CLAWHunter v3.3.0 Architecture", labelloc=t, pad=0.5]
+    graph [rankdir=TB, bgcolor="#0d1117", fontcolor="#e6edf3", fontname="Helvetica", label="CLAWHunter v3.4.0 Architecture", labelloc=t, pad=0.5]
     node [shape=box, style="filled,rounded", fontname="Helvetica", fontcolor="#e6edf3", color="#484f58", fillcolor="#161b22"]
     edge [color="#8b949e", fontcolor="#8b949e", fontname="Helvetica"]
 

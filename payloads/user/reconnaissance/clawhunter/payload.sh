@@ -7,7 +7,7 @@
 # For the Hak5 WiFi Pineapple Pager (480×222 px, 16-bit color, 221 PPI)
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.3.0
+# PAYLOAD_VERSION: 3.4.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -33,7 +33,7 @@
 #            reversible MAC state, no staged code, and no implicit exfiltration.
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.3.0"
+readonly PAYLOAD_VERSION="3.4.0"
 # Current and optional port sets are centralized here so UI labels, checkpoints,
 # scan workers, and reports derive from one normalized selection.
 readonly OPENCLAW_DEFAULT_PORT=18789

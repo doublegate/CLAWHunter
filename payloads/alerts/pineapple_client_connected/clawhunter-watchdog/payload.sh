@@ -3,7 +3,7 @@
 # Title: CLAWHunter Watchdog
 # Description: Silently assess a newly connected Pineapple client for a current OpenClaw gateway signature.
 # Author: doublegate
-# Version: 3.3.0
+# Version: 3.4.0
 # Category: pineapple_client_connected
 #
 # Event contract:
@@ -12,7 +12,7 @@
 #   Output - one local alert log plus brief LED/haptic state; never audio/dialog.
 #   Budget - no subnet discovery, picker, readiness, canvas, or legacy-port work.
 
-readonly PAYLOAD_VERSION="3.3.0"
+readonly PAYLOAD_VERSION="3.4.0"
 readonly OPENCLAW_DEFAULT_PORT=18789
 readonly LOOT_BASE="/root/loot/clawhunter"
 # SILENT suppresses shared feedback helpers. The two direct VIBRATE calls below

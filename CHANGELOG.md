@@ -4,7 +4,28 @@ All notable changes to CLAWHunter are documented here.
 
 ---
 
-## [Unreleased]
+## [v3.4.0] - 2026-08-09
+
+Security and release-integrity maintenance. No new operator-facing features and
+no protocol changes; the fingerprinting, scan, and assessment behaviour of
+v3.3.0 is unchanged. Two of the three fixes alter how files are written on the
+device, so an upgrade is recommended for anyone whose Pager stores loot.
+
+### Security
+- **Loot is no longer world-readable.** Scan output names third-party hosts and
+  records harvested evidence about them, but reports and logs were created 0644
+  in a 0755 directory. `lib/common.sh` now sets `umask 077` before the first
+  write, covering logs, JSON reports, checkpoint files, and any child process
+  the payload spawns. A loot directory inherited from an earlier release is
+  additionally `chmod 0700`, and that call fails closed: the library refuses to
+  run rather than write evidence into a directory it could not secure.
+- **`harvest.py` writes its report atomically at 0600.** It creates an `O_EXCL`
+  temporary file and `os.replace()`s it over the destination, rather than
+  opening the destination directly — `O_CREAT`'s mode applies only when a file
+  is created, so a report left by an earlier run would otherwise have been
+  written at its existing mode and only restricted afterwards. The rename also
+  makes the write crash-safe: losing power mid-scan now leaves the previous
+  report intact instead of truncated.
 
 ### Fixed
 - Made release packaging reproducible across hosts. `scripts/package-release.sh`
@@ -20,6 +41,14 @@ All notable changes to CLAWHunter are documented here.
 - `scripts/check.sh` now asserts the release manifest is in C-locale byte order.
   Its existing two-build comparison runs on one host under one locale and so
   cannot detect collation drift by construction.
+
+### Validated
+- v3.3.0 was validated on physical hardware for the first time (WiFi Pineapple
+  Pager, OpenWrt 24.10.1, `ramips/mt76x8`, kernel 6.6.86). 14 checks pass on
+  device, including detection reaching `CONFIRMED` with the full evidence chain
+  and the harvest engine reaching `ASSESSED` through both authorized read-only
+  tools. Portal rendering, button navigation, alert delivery, RF association,
+  and audio remain unvalidated. See `docs/V3.4-RELEASE-CHECKLIST.md`.
 
 ---
 

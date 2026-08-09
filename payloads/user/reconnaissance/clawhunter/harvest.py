@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 # VERSION must match common.sh and all three Pager entry points.
-VERSION = "3.3.0"
+VERSION = "3.4.0"
 # Hard upper bound across discovery, health, WebSocket, tools, and report work.
 GLOBAL_CEILING = 180
 # Per-response memory ceiling; report fields apply smaller readability caps.

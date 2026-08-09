@@ -9,7 +9,7 @@
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(36 621)">
 <title>CLAWHunter</title>
 <polygon fill="#0d1117" stroke="none" points="-36,36 -36,-621 797.12,-621 797.12,36 -36,36"/>
-<text xml:space="preserve" text-anchor="middle" x="380.56" y="-567.7" font-family="Helvetica,sans-Serif" font-size="14.00" fill="#e6edf3">CLAWHunter v3.3.0 Architecture</text>
+<text xml:space="preserve" text-anchor="middle" x="380.56" y="-567.7" font-family="Helvetica,sans-Serif" font-size="14.00" fill="#e6edf3">CLAWHunter v3.4.0 Architecture</text>
 <!-- user -->
 <g id="node1" class="node">
 <title>user</title>

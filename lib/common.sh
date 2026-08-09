@@ -6,7 +6,7 @@
 # interactive, Recon, and alert entry points. Functions deliberately publish
 # probe results through PROBE_* globals because Pager payloads are Bash scripts
 # and callers need every evidence field without parsing subprocess output.
-# VERSION: 3.3.0
+# VERSION: 3.4.0
 
 # Hak5 ships its DuckyScript-backed shell helpers here. Host-side tests do not,
 # so a missing file is non-fatal and the tests provide narrow fixture stubs.
@@ -14,7 +14,7 @@
 
 # Callers may define these before sourcing the library. The defaults allow the
 # library to operate in a standalone Portal package as well as the suite layout.
-: "${PAYLOAD_VERSION:=3.3.0}"
+: "${PAYLOAD_VERSION:=3.4.0}"
 : "${LOOT_BASE:=/root/loot/clawhunter}"
 : "${SILENT:=0}"
 : "${FOUND_COUNT:=0}"

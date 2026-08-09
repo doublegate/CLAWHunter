@@ -8,7 +8,7 @@
 # For the Hak5 WiFi Pineapple Pager — Runs from Recon UI against a selected AP
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.3.0
+# PAYLOAD_VERSION: 3.4.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -37,7 +37,7 @@
 #   Exit   - disconnect and clear the client configuration on every path.
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.3.0"
+readonly PAYLOAD_VERSION="3.4.0"
 # 18789 is current; 18790 remains a bounded legacy secondary probe in Recon.
 readonly OPENCLAW_DEFAULT_PORT=18789
 readonly LOOT_BASE="/root/loot/clawhunter"

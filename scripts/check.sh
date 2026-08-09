@@ -59,16 +59,16 @@ versions=$(sed -nE \
     | sort -u)
 # One unique value is necessary but not sufficient; require the intended release
 # value explicitly so an accidental unified downgrade also fails.
-[ "$versions" = "3.3.0" ] || {
+[ "$versions" = "3.4.0" ] || {
     printf 'Version mismatch:\n%s\n' "$versions" >&2
     exit 1
 }
 # User-facing release surfaces are not parsed as runtime declarations, so assert
 # their exact current markers separately to catch stale badge/install/changelog.
-grep -q 'version-3.3.0-green' README.md
-grep -q '^## \[v3.3.0\] - 2026-08-06$' CHANGELOG.md
-grep -q 'CLAWHunter v3.3.0 installed' scripts/install-pager.sh
-grep -q 'CLAWHunter v3.3.0 Architecture' docs/architecture.dot
+grep -q 'version-3.4.0-green' README.md
+grep -q '^## \[v3.4.0\] - 2026-08-09$' CHANGELOG.md
+grep -q 'CLAWHunter v3.4.0 installed' scripts/install-pager.sh
+grep -q 'CLAWHunter v3.4.0 Architecture' docs/architecture.dot
 # Reject the obsolete numeric VIBRATE form: current Pager firmware expects a
 # filename or complete RTTTL string for every direct/shared haptic invocation.
 ! rg -n 'VIBRATE[[:space:]]+[0-9]+' lib payloads
@@ -82,23 +82,23 @@ scripts/package-release.sh "$tmp_one" >/dev/null
 scripts/package-release.sh "$tmp_two" >/dev/null
 # Exact byte comparison validates tar/gzip metadata normalization, not merely an
 # equivalent unpacked file set.
-cmp "$tmp_one/clawhunter-v3.3.0-pager.tar.gz" "$tmp_two/clawhunter-v3.3.0-pager.tar.gz"
-tar -tzf "$tmp_one/clawhunter-v3.3.0-pager.tar.gz" > "$tmp_one/archive-contents.txt"
+cmp "$tmp_one/clawhunter-v3.4.0-pager.tar.gz" "$tmp_two/clawhunter-v3.4.0-pager.tar.gz"
+tar -tzf "$tmp_one/clawhunter-v3.4.0-pager.tar.gz" > "$tmp_one/archive-contents.txt"
 grep -q 'payloads/user/reconnaissance/clawhunter/common.sh' "$tmp_one/archive-contents.txt"
 # These assertions keep the release artifact self-contained: its README links
 # remain valid even when an operator downloads the archive without cloning Git.
 grep -q 'docs/V3.3-RESEARCH.md' "$tmp_one/archive-contents.txt"
-grep -q 'docs/V3.3-RELEASE-NOTES.md' "$tmp_one/archive-contents.txt"
+grep -q 'docs/V3.4-RELEASE-NOTES.md' "$tmp_one/archive-contents.txt"
 grep -q 'images/architecture.png' "$tmp_one/archive-contents.txt"
 grep -q 'CONTRIBUTING.md' "$tmp_one/archive-contents.txt"
 # Verify both distribution integrity layers exactly as an operator will: the
 # adjacent archive checksum first, then every unpacked file in SHA256SUMS.
 (
     cd "$tmp_one"
-    sha256sum -c clawhunter-v3.3.0-pager.tar.gz.sha256 >/dev/null
+    sha256sum -c clawhunter-v3.4.0-pager.tar.gz.sha256 >/dev/null
     mkdir unpacked
-    tar -xzf clawhunter-v3.3.0-pager.tar.gz -C unpacked
-    cd unpacked/clawhunter-v3.3.0
+    tar -xzf clawhunter-v3.4.0-pager.tar.gz -C unpacked
+    cd unpacked/clawhunter-v3.4.0
     sha256sum -c SHA256SUMS >/dev/null
     # Reproducibility is cross-host, not merely twice-on-this-host: the two
     # builds above share one locale, so they cannot detect collation drift.
