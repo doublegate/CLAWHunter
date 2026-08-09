@@ -933,6 +933,12 @@ LOG blue "Local IP: ${LOCAL_IP:-unknown}"
 sleep 1
 
 # ── Feature 10: Multi-subnet loop ─────────────────────────────────────────────
+# Consecutive rejected picker values before the payload gives up and exits
+# cleanly. Reset after every accepted value, so a genuine typo costs a retry
+# rather than the whole session.
+readonly MAX_BAD_INPUT=3
+BAD_INPUT=0
+
 while true; do
 
     # ── Subnet picker ──────────────────────────────────────────────
@@ -944,9 +950,22 @@ while true; do
             LOG red "Cancelled"; break ;;
     esac
     if ! is_valid_ipv4 "$TARGET_NETWORK_IP"; then
+        # Bounded retry. A bare `continue` here re-opens the picker forever, and
+        # on a device whose only surface is the screen an unbounded loop is
+        # indistinguishable from a hardware lockup -- it can only be escaped by
+        # a power cycle. Any condition that makes the picker keep returning an
+        # unusable value (EOF on a non-interactive run, a cancel whose status is
+        # not recognised, a firmware quirk) lands here, so cap it and leave.
+        BAD_INPUT=$((BAD_INPUT + 1))
+        if [ "$BAD_INPUT" -ge "$MAX_BAD_INPUT" ]; then
+            ERROR_DIALOG "Input Error" \
+                "No valid IPv4 after ${MAX_BAD_INPUT} attempts — exiting"
+            break
+        fi
         ERROR_DIALOG "Invalid IPv4" "$TARGET_NETWORK_IP"
         continue
     fi
+    BAD_INPUT=0
     SUBNET=$(subnet_prefix_from_ip "$TARGET_NETWORK_IP")
 
     # ── Port picker ────────────────────────────────────────────────
@@ -958,9 +977,17 @@ while true; do
             LOG red "Cancelled"; break ;;
     esac
     if ! is_valid_port "$TARGET_PORT"; then
+        # Same bound as the IPv4 picker above, for the same reason.
+        BAD_INPUT=$((BAD_INPUT + 1))
+        if [ "$BAD_INPUT" -ge "$MAX_BAD_INPUT" ]; then
+            ERROR_DIALOG "Input Error" \
+                "No valid port after ${MAX_BAD_INPUT} attempts — exiting"
+            break
+        fi
         ERROR_DIALOG "Invalid Port" "$TARGET_PORT"
         continue
     fi
+    BAD_INPUT=0
 
     # ── Advanced options (skip for AGGRESSIVE — already set by profile) ───────
     if [ "$SCAN_PROFILE" != "AGGRESSIVE" ]; then

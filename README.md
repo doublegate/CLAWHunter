@@ -58,7 +58,7 @@ CLAWHunter bootstraps `/mmc/bin`, `/mmc/sbin`, `/mmc/usr/bin`, `/mmc/usr/sbin`, 
 | 1.0.8 | Not recommended for v3.3 | Added list picker, payload metadata, and line-ending rewriting, but predates later context fixes |
 | 1.0.7 and older | Unsupported for v3.3 | Missing later payload-context and Portal fixes |
 
-The payloads keep local/shared-library fallback resolution rather than relying on `_PAYLOAD_HOME`, so manual, Portal, and repository layouts remain testable. Firmware-specific details and every reviewed changelog are recorded in [docs/V3.3-RESEARCH.md](docs/V3.3-RESEARCH.md).
+The payloads resolve their resource directory from `_PAYLOAD_HOME` first, then `PAYLOAD_HOME`, `PWD`, and finally `dirname "$0"`, taking the first candidate that actually contains payload resources. The firmware copies a payload to `/tmp/payload-<random>.sh` and executes the copy, so `$0` names a temp file with no resources beside it; `_PAYLOAD_HOME` is the only authoritative source under the launcher operators actually use. The later candidates keep manual, Portal, and repository layouts testable. Firmware-specific details and every reviewed changelog are recorded in [docs/V3.3-RESEARCH.md](docs/V3.3-RESEARCH.md).
 
 ## Repository Structure
 
