@@ -222,7 +222,9 @@ READY=0
 for _i in $(seq 1 30); do
     # Query only wlan0cli. An address on management/PineAP interfaces must not
     # be mistaken for successful association to the selected target AP.
-    CIDR=$(ip -4 -o addr show dev "$WIFI_IF" 2>/dev/null | awk '{print $4}' | head -1)
+    # BusyBox `ip` accepts -o and -f inet but not -4; use the portable form so
+    # this resolves on the Pager as well as on a full-iproute2 host.
+    CIDR=$(ip -o -f inet addr show dev "$WIFI_IF" 2>/dev/null | awk '{print $4}' | head -1)
     if [ -n "$CIDR" ]; then READY=1; break; fi
     sleep 1
 done

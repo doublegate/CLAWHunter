@@ -24,6 +24,16 @@ fails immediately when launched from the device.
   `PAYLOAD_HOME`, `PWD`, and finally `dirname "$0"`, taking the first candidate
   that actually holds payload resources, with `/root/payloads/lib/common.sh` as
   an absolute last resort. Manual, Portal, and repository layouts still work.
+- **Local IPv4 and interface detection did not work on the Pager.** The payloads
+  used `ip route get 1.1.1.1` and `ip -4 -o addr show`, but the device ships
+  BusyBox's `ip`, which supports neither `route get` nor `-4` — its own usage
+  lists only `route list|flush|add|del|change|append|replace|test` and the
+  options `-f family` and `-o oneline`. Both calls therefore returned nothing on
+  device and the target picker silently defaulted to `192.168.1.1` instead of
+  the network the Pager was actually on. Detection now lives in
+  `detect_local_ipv4` and `detect_default_iface` in `lib/common.sh`, which try
+  the full-iproute2 form first, then BusyBox-compatible `ip -o -f inet` and
+  `ip route` parsing, then `ifconfig`.
 - **A rejected picker value looped forever.** The IPv4 and port pickers ended an
   invalid value with an unbounded `continue`, redrawing the error dialog with no
   exit. On a device whose only surface is the screen that is indistinguishable
@@ -44,8 +54,9 @@ fails immediately when launched from the device.
   opening the destination directly — `O_CREAT`'s mode applies only when a file
   is created, so a report left by an earlier run would otherwise have been
   written at its existing mode and only restricted afterwards. The rename also
-  makes the write crash-safe: losing power mid-scan now leaves the previous
-  report intact instead of truncated.
+  makes the write durable: the temporary file and the parent directory are
+  both fsynced, so an interrupted process or a power cut mid-scan leaves either
+  the previous report or the new one, never a truncated or empty file.
 
 ### Fixed
 - Made release packaging reproducible across hosts. `scripts/package-release.sh`

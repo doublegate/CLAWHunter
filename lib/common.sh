@@ -408,6 +408,44 @@ mdns_prescan() {
 
 # Return IPv4 neighbors belonging to the selected /24. IPv6 never enters this
 # dot-field sort; that separation fixes the v3.2.0 IPv4/IPv6 collision class.
+# The Pager ships BusyBox's `ip`, whose own usage is:
+#   ip route list|flush|add|del|change|append|replace|test ROUTE
+#   OPTIONS := -f[amily] inet|inet6|link | -o[neline]
+# There is no `route get` and no `-4`, so the full-iproute2 idioms
+# `ip route get 1.1.1.1` and `ip -4 -o addr show` both produce nothing on
+# device. Callers previously fell through to a hardcoded 192.168.1.1 default,
+# which silently offered the operator the wrong network. These helpers try the
+# full-iproute2 form first for development hosts, then BusyBox-compatible forms.
+
+# Print the primary non-loopback IPv4 address, or nothing.
+detect_local_ipv4() {
+    local ip=""
+    ip=$(ip route get 1.1.1.1 2>/dev/null \
+        | awk '/src/{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}' | head -1)
+    is_valid_ipv4 "$ip" && { printf '%s\n' "$ip"; return 0; }
+    # BusyBox honours -o and -f inet; the address column is "A.B.C.D/len".
+    ip=$(ip -o -f inet addr show 2>/dev/null \
+        | awk '$4 !~ /^127\./ {split($4,a,"/"); print a[1]; exit}')
+    is_valid_ipv4 "$ip" && { printf '%s\n' "$ip"; return 0; }
+    ip=$(ifconfig 2>/dev/null \
+        | awk '/inet addr:/{split($2,a,":"); if(a[2] !~ /^127\./){print a[2]; exit}}')
+    is_valid_ipv4 "$ip" && { printf '%s\n' "$ip"; return 0; }
+    return 1
+}
+
+# Print the interface carrying the default route, or nothing.
+detect_default_iface() {
+    local iface=""
+    iface=$(ip route get 1.1.1.1 2>/dev/null \
+        | awk '/dev/{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}' | head -1)
+    [ -n "$iface" ] && { printf '%s\n' "$iface"; return 0; }
+    # `ip route` (list) is supported by BusyBox; take the default route's dev.
+    iface=$(ip route 2>/dev/null \
+        | awk '/^default/{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}' | head -1)
+    [ -n "$iface" ] && { printf '%s\n' "$iface"; return 0; }
+    return 1
+}
+
 arp_cache_harvest() {
     local subnet="$1"
     {

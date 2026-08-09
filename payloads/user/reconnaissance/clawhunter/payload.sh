@@ -880,7 +880,7 @@ case "$resp" in
     "$DUCKYSCRIPT_USER_CONFIRMED")
         # Use the routed interface rather than assuming wlan0; fall back only
         # when route inspection provides no device name.
-        local_iface=$(ip route get 1.1.1.1 2>/dev/null | awk '/dev/{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}' | head -1)
+        local_iface=$(detect_default_iface)
         [ -z "$local_iface" ] && local_iface="wlan0"
         mac_randomize "$local_iface"
         ;;
@@ -923,10 +923,7 @@ sleep 1
 # Derive a convenient picker default from the active route without assuming a
 # fixed Pineapple/client subnet. The operator still explicitly confirms the full
 # target IPv4 address; CLAWHunter then bounds scanning to that address's /24.
-LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}' | head -1)
-if ! is_valid_ipv4 "$LOCAL_IP"; then
-    LOCAL_IP=$(ip -4 -o addr show 2>/dev/null | awk '$4 !~ /^127\./ {split($4,a,"/"); print a[1]; exit}')
-fi
+LOCAL_IP=$(detect_local_ipv4)
 DEFAULT_TARGET_IP="192.168.1.1"
 is_valid_ipv4 "$LOCAL_IP" && DEFAULT_TARGET_IP="$LOCAL_IP"
 LOG blue "Local IP: ${LOCAL_IP:-unknown}"
