@@ -10,6 +10,12 @@ If `$ARGUMENTS` is empty, ask for the target semantic version and stop until ans
 Throughout, `NEW` is that version (e.g. `3.4.0`) and `OLD` is the current one — read `OLD`
 from `VERSION=` in `scripts/package-release.sh`, never assume it.
 
+Validate `NEW` against `^[0-9]+\.[0-9]+\.[0-9]+$` before doing anything else, and stop if it
+fails. Both downstream contracts are strict about this shape: `release.yml` only triggers on
+tags matching `v[0-9]+.[0-9]+.[0-9]+`, and `check.sh`'s unified-version `sed` only recognizes
+three-part versions. A `v` prefix, a pre-release suffix, or a two-part version would sail
+through the edits and strand the release at the tag.
+
 Publishing is **irreversible**: `.github/workflows/release.yml` refuses to replace an
 already-published release, so a wrong tag cannot be fixed by re-tagging. Stop and ask
 rather than guess at any step.
@@ -21,12 +27,26 @@ Verify and report each; stop on any failure:
 - On `main`, working tree clean, up to date with `origin/main`.
 - `shellcheck`, `rg`, `curl`, and `nc` are on PATH. `scripts/check.sh` needs all four; a
   missing `nc` surfaces misleadingly as `FAIL: loopback classifier probe failed`.
-- `git tag -l "v$NEW"` is empty and `gh release view "v$NEW"` 404s.
-- **Check whether `v$OLD` was ever tagged and published** — `git tag -l "v$OLD"` and
-  `gh release view "v$OLD"`. This repo has shipped a version in code while deliberately
-  deferring its tag, so an untagged `OLD` is a real state, not a mistake. If `v$OLD` is
-  untagged, say so and ask whether to finish that release first or supersede it; do not
-  quietly roll it into `NEW`. `docs/V<OLD>-RELEASE-CHECKLIST.md` records how far it got.
+- `gh` is on PATH **and authenticated** (`gh auth status`). Several steps below query and
+  later publish through it; without this you get `command not found` or an auth prompt
+  midway, after edits have already landed.
+- **`v$NEW` does not exist anywhere.** Check the remote, not just local refs:
+  `git ls-remote --tags origin "refs/tags/v$NEW"` is empty and `gh release view "v$NEW"`
+  404s. A tag pushed from another machine will not appear in local `git tag -l`, and you
+  would only discover it when the final push is rejected — after the release commit and PR
+  already exist.
+- **Check whether `v$OLD` was tagged *and* published** — `git ls-remote --tags origin` plus
+  `gh release view "v$OLD"`. Three states are possible and they need different answers:
+  - *Tagged and released* — normal; proceed.
+  - *Untagged* — this repo has shipped a version in code while deliberately deferring its
+    tag, so this is a real state, not a mistake. Ask whether to finish that release first
+    or supersede it; do not quietly roll it into `NEW`.
+  - *Tagged but unreleased* — usually the wreckage of a failed `release.yml` run. Do not
+    treat `v$OLD` as shipped: Step 3's `v$OLD..HEAD` range would silently omit everything
+    that tag already covers. Report it and ask whether to repair that release or supersede
+    it.
+
+  `docs/V<OLD>-RELEASE-CHECKLIST.md` records how far the previous attempt got.
 - `scripts/check.sh` passes **before** any edits. A red baseline means the release is
   not the thing to debug.
 - **There is something to release.** Summarize the commits since the last release actually
@@ -50,8 +70,9 @@ Record anything new in the research doc (see Step 2 for its name).
 
 ## Step 2 — Bump every pinned literal
 
-`scripts/check.sh` pins the version in more places than the runtime declarations. Miss one
-and the gate fails. Update all of these, then verify with
+`scripts/check.sh` pins the version in more places than the runtime declarations. Eleven
+files are involved and several hold more than one occurrence, so work file by file rather
+than counting literals. Miss one and the gate fails. Update all of these, then verify with
 `rg -n "$OLD" --glob '!CHANGELOG.md'` returning nothing unexpected.
 
 Runtime declarations — `check.sh` reads these with one regex and permits a single value:
@@ -165,12 +186,20 @@ answer verbatim in the release notes and the PR body. Never infer or fabricate t
 rm -rf dist && scripts/package-release.sh dist
 ```
 
-Then verify as an operator would, and report each result:
+Then verify as an operator would, and report each result. Both manifests store **bare
+basenames**, so every `-c` must run from the directory holding the files it names —
+`sha256sum -c dist/...sha256` from the repo root reports `No such file or directory` and a
+`FAILED open or read`, which looks like corruption rather than a wrong working directory.
+Use a subshell so the `cd` does not leak, exactly as `check.sh` does:
 
-- `sha256sum -c dist/clawhunter-v$NEW-pager.tar.gz.sha256`
-- Extract, `cd` into the package root, `sha256sum -c SHA256SUMS`.
+```bash
+( cd dist && sha256sum -c "clawhunter-v$NEW-pager.tar.gz.sha256" )
+( cd dist && mkdir -p unpacked && tar -xzf "clawhunter-v$NEW-pager.tar.gz" -C unpacked \
+  && cd "unpacked/clawhunter-v$NEW" && sha256sum -c SHA256SUMS )
+```
+
 - Confirm the embedded `common.sh` beside each of the three payloads is byte-identical to
-  `lib/common.sh`.
+  `lib/common.sh` (`cmp`, one per payload directory).
 
 `dist/` is gitignored; CI rebuilds from the tag, so this local build is verification only
 and is never uploaded.
@@ -185,13 +214,25 @@ Report, and stop if anything is off:
 
 ## Step 8 — Commit, PR, tag
 
-Confirm with the user before **each** outward-facing action; do not chain them.
+Every numbered action below is a separate stop. Ask, wait for an answer, do that one thing,
+report the result — then ask about the next. Do not batch two of them into one question, and
+do not treat approval of one as approval of the next: each step widens who can see the
+release, and the last one cannot be undone.
 
-1. Branch `release/v$NEW`, commit as `feat: release v$NEW`, push, open a PR whose body
-   carries the gate result and the Step 5 firmware statement.
-2. After the PR is reviewed and merged, update local `main`.
-3. **Ask for explicit confirmation**, then create the annotated tag on the merge commit:
-   `git tag -a "v$NEW" -m "CLAWHunter v$NEW"` and `git push origin "v$NEW"`.
+Local work (reversible) needs no gate:
+
+1. Branch `release/v$NEW` and commit as `feat: release v$NEW`.
+
+Each of these is outward-facing. Confirm separately before each:
+
+2. **Push** the branch to `origin`.
+3. **Open the PR**, with a body carrying the gate result and the Step 5 firmware statement.
+4. After review and merge, update local `main` and re-run `scripts/check.sh` on the merge
+   commit — the merge may not be what either parent was.
+5. **Create** the annotated tag on the merge commit: `git tag -a "v$NEW" -m "CLAWHunter v$NEW"`.
+   Local only, still recoverable with `git tag -d`.
+6. **Push the tag** — `git push origin "v$NEW"`. This is the irreversible one. State plainly
+   that it will publish, and get an unambiguous yes.
 
 Pushing the tag triggers `release.yml`, which rebuilds from the tag, re-runs the gate,
 asserts the tag equals `package-release.sh`'s `VERSION`, and publishes the archive and

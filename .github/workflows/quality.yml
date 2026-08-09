@@ -17,10 +17,16 @@ jobs:
     steps:
       # Pin the major official action; repository contents are read-only here.
       - uses: actions/checkout@v4
-      - name: Install ShellCheck
-        # ShellCheck is the only package absent from the runner image that the
-        # gate requires. Payload Python remains standard-library-only.
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Install host gate dependencies
+        # scripts/check.sh needs shellcheck, rg, curl and nc on the host (payload
+        # Python remains standard-library-only). ubuntu-latest currently ships
+        # the last three, but relying on that is fragile: a missing nc surfaces
+        # only as "FAIL: loopback classifier probe failed", which reads as a
+        # classifier defect rather than absent tooling. Name them explicitly so
+        # an image change fails at install time with an obvious cause.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck ripgrep netcat-openbsd curl
       - name: Run quality gate
         # Keep CI and contributor/release validation on one maintained command.
         run: scripts/check.sh

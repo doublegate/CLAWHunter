@@ -33,10 +33,13 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Install release gate dependency
-        # Payload Python remains standard-library-only; ShellCheck is the sole
-        # additional host package needed by the same gate used on pull requests.
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Install release gate dependencies
+        # Payload Python remains standard-library-only, but the host gate also
+        # shells out to rg, curl and nc. Keep this list identical to
+        # quality.yml so a tag build cannot fail on tooling a pull request had.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck ripgrep netcat-openbsd curl
 
       - name: Validate tag and release candidate
         shell: bash
