@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Device-local installer for an unpacked v3.3.0 release bundle. POSIX sh is
+# Device-local installer for an unpacked v3.4.0 release bundle. POSIX sh is
 # used intentionally because installation must work before optional Bash/Python
 # packages are considered. Pass a destination root to stage/test elsewhere;
 # the production default is the Pager's canonical /root/payloads tree.
@@ -48,4 +48,4 @@ install_payload \
     "$DEST_ROOT/alerts/pineapple_client_connected/clawhunter-watchdog"
 
 # Print one stable success line for operators and the install-layout gate.
-printf 'CLAWHunter v3.3.0 installed under %s\n' "$DEST_ROOT"
+printf 'CLAWHunter v3.4.0 installed under %s\n' "$DEST_ROOT"

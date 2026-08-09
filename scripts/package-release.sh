@@ -7,7 +7,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 # The optional output directory supports CI/temp builds without polluting the
 # repository. VERSION and ARCHIVE are intentionally explicit release contracts.
 OUTPUT_DIR=${1:-"$ROOT/dist"}
-VERSION=3.3.0
+VERSION=3.4.0
 ARCHIVE="clawhunter-v${VERSION}-pager.tar.gz"
 STAGE=$(mktemp -d /tmp/clawhunter-package-XXXXXX)
 # Only the private stage is removed; caller-selected OUTPUT_DIR is preserved.

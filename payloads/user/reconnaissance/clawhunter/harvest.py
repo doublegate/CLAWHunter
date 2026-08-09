@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 # VERSION must match common.sh and all three Pager entry points.
-VERSION = "3.3.0"
+VERSION = "3.4.0"
 # Hard upper bound across discovery, health, WebSocket, tools, and report work.
 GLOBAL_CEILING = 180
 # Per-response memory ceiling; report fields apply smaller readability caps.
@@ -417,8 +417,8 @@ def main() -> int:
         # file is created, so a report left by an earlier run would be opened at
         # its existing mode and hold the evidence at that mode for the whole
         # write, with a chmod afterwards closing the door too late. O_EXCL keeps
-        # this from adopting a stale temp file, and the rename is atomic, so a
-        # crash mid-write leaves the previous report intact instead of truncated.
+        # this from adopting a stale temp file, and the rename is atomic, so an
+        # interrupted write leaves the previous report intact, not truncated.
         tmp = output.with_name(output.name + ".tmp")
         try:
             os.unlink(tmp)
@@ -433,8 +433,21 @@ def main() -> int:
             raise
         with handle as fh:
             fh.write(render_report(report))
+            # Atomic rename alone survives a killed process, not a power cut:
+            # without these barriers the rename can reach the disk before the
+            # data does, leaving a present-but-empty report. The Pager runs on
+            # battery and a scan is exactly when it may die, so pay for the
+            # syncs -- the report is a few kilobytes.
+            fh.flush()
+            os.fsync(fh.fileno())
         # Replace preserves the temp file's 0600; the destination inode is gone.
         os.replace(tmp, output)
+        # Durability of the rename itself lives in the parent directory entry.
+        dir_fd = os.open(output.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
     except OSError as exc:
         print(f"harvest.py: failed to write {output}: {exc}", file=sys.stderr)
         return 3

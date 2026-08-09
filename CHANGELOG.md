@@ -4,7 +4,57 @@ All notable changes to CLAWHunter are documented here.
 
 ---
 
-## [Unreleased]
+## [v3.4.0] - 2026-08-09
+
+Fixes the interactive payload, which could not run from the Pager UI in any
+earlier release, plus loot permissions and cross-host reproducible packaging.
+No protocol changes: fingerprinting, scan, and assessment behaviour is unchanged
+from v3.3.0. **Upgrading is strongly recommended** — on v3.3.0 the user payload
+fails immediately when launched from the device.
+
+### Fixed — payload could not launch from the Pager UI
+- **`payload.sh` could not locate `common.sh` when started from the device**,
+  failing instantly with `Install Error / CLAWHunter common.sh was not found`.
+  The firmware does not execute the installed file: it prepends a prelude,
+  writes the result to `/tmp/payload-<random>.sh`, and runs that copy. All three
+  payloads derived their resource directory from `$0`, which therefore named a
+  temp file with no resources beside it, so every branch of the resolution chain
+  missed. `BASH_SOURCE` would not have helped — the firmware copies the file, so
+  it names the same temp path. Resolution now prefers `_PAYLOAD_HOME`, then
+  `PAYLOAD_HOME`, `PWD`, and finally `dirname "$0"`, taking the first candidate
+  that actually holds payload resources, with `/root/payloads/lib/common.sh` as
+  an absolute last resort. Manual, Portal, and repository layouts still work.
+- Centralised local address and interface detection into `detect_local_ipv4` and
+  `detect_default_iface` in `lib/common.sh`, replacing the same `ip route get` /
+  `ip -4 -o addr show` pair duplicated across two payloads. Each helper tries
+  full-iproute2 syntax, then `ip -o -f inet` and `ip route` parsing, then
+  `ifconfig`, and every candidate is validated before use. This is defensive
+  hardening, not a bug fix: the previous code was verified working on a Pager
+  (BusyBox 1.36.1 `ip` implements both `route get` and `-4`, and the existing
+  fallback already resolved the correct address when no default route exists).
+- **A rejected picker value looped forever.** The IPv4 and port pickers ended an
+  invalid value with an unbounded `continue`, redrawing the error dialog with no
+  exit. On a device whose only surface is the screen that is indistinguishable
+  from a hardware lockup and escapable only by power-cycling. Consecutive
+  rejections are now capped at three, after which the payload exits cleanly with
+  a stated reason; the counter resets on every accepted value.
+
+### Security
+- **Loot is no longer world-readable.** Scan output names third-party hosts and
+  records harvested evidence about them, but reports and logs were created 0644
+  in a 0755 directory. `lib/common.sh` now sets `umask 077` before the first
+  write, covering logs, JSON reports, checkpoint files, and any child process
+  the payload spawns. A loot directory inherited from an earlier release is
+  additionally `chmod 0700`, and that call fails closed: the library refuses to
+  run rather than write evidence into a directory it could not secure.
+- **`harvest.py` writes its report atomically at 0600.** It creates an `O_EXCL`
+  temporary file and `os.replace()`s it over the destination, rather than
+  opening the destination directly — `O_CREAT`'s mode applies only when a file
+  is created, so a report left by an earlier run would otherwise have been
+  written at its existing mode and only restricted afterwards. The rename also
+  makes the write durable: the temporary file and the parent directory are
+  both fsynced, so an interrupted process or a power cut mid-scan leaves either
+  the previous report or the new one, never a truncated or empty file.
 
 ### Fixed
 - Made release packaging reproducible across hosts. `scripts/package-release.sh`
@@ -20,6 +70,14 @@ All notable changes to CLAWHunter are documented here.
 - `scripts/check.sh` now asserts the release manifest is in C-locale byte order.
   Its existing two-build comparison runs on one host under one locale and so
   cannot detect collation drift by construction.
+
+### Validated
+- v3.3.0 was validated on physical hardware for the first time (WiFi Pineapple
+  Pager, OpenWrt 24.10.1, `ramips/mt76x8`, kernel 6.6.86). 14 checks pass on
+  device, including detection reaching `CONFIRMED` with the full evidence chain
+  and the harvest engine reaching `ASSESSED` through both authorized read-only
+  tools. Portal rendering, button navigation, alert delivery, RF association,
+  and audio remain unvalidated. See `docs/V3.4-RELEASE-CHECKLIST.md`.
 
 ---
 

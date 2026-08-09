@@ -7,7 +7,7 @@
 # For the Hak5 WiFi Pineapple Pager (480×222 px, 16-bit color, 221 PPI)
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.3.0
+# PAYLOAD_VERSION: 3.4.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -33,7 +33,7 @@
 #            reversible MAC state, no staged code, and no implicit exfiltration.
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.3.0"
+readonly PAYLOAD_VERSION="3.4.0"
 # Current and optional port sets are centralized here so UI labels, checkpoints,
 # scan workers, and reports derive from one normalized selection.
 readonly OPENCLAW_DEFAULT_PORT=18789
@@ -45,18 +45,46 @@ readonly WIFI_IF="wlan0cli"
 
 # Resolve common.sh in three supported layouts: self-contained Portal payload,
 # installed suite (/root/payloads/lib), and repository checkout for development.
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLAWHUNTER_PAYLOAD_DIR="$SCRIPT_DIR"
+# Locate this payload's own directory. The Pager firmware copies payload.sh to
+# /tmp/payload-<random>.sh and executes the copy, so "$0" -- and BASH_SOURCE with
+# it -- names a temp file with no payload resources beside it. Resolving from
+# "$0" alone therefore fails on every UI launch, which is the one path operators
+# actually use. The firmware compensates by exporting _PAYLOAD_HOME and by
+# setting the working directory to the payload directory; prefer those, then
+# fall back to "$0" so manual, repository, and staged invocations still work.
+# A candidate only counts if it holds payload resources, so a stray PWD cannot
+# silently win.
+CLAWHUNTER_PAYLOAD_DIR=""
+for _claw_cand in "${_PAYLOAD_HOME:-}" "${PAYLOAD_HOME:-}" "$PWD" "$(dirname "$0")"; do
+    [ -n "$_claw_cand" ] && [ -d "$_claw_cand" ] || continue
+    if [ -f "${_claw_cand}/common.sh" ] || [ -f "${_claw_cand}/payload.sh" ]; then
+        CLAWHUNTER_PAYLOAD_DIR="$(cd "$_claw_cand" && pwd)"
+        break
+    fi
+done
+unset _claw_cand
+# Last resort keeps the relative-layout probes below meaningful even when no
+# candidate identified itself.
+[ -n "$CLAWHUNTER_PAYLOAD_DIR" ] || CLAWHUNTER_PAYLOAD_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$CLAWHUNTER_PAYLOAD_DIR"
 export CLAWHUNTER_PAYLOAD_DIR
-if [ -f "${SCRIPT_DIR}/common.sh" ]; then
-    # Release/Portal layout: payload resources are self-contained.
-    . "${SCRIPT_DIR}/common.sh"
-elif [ -f "${SCRIPT_DIR}/../../../lib/common.sh" ]; then
-    # Installed suite layout: /root/payloads/lib/common.sh.
-    . "${SCRIPT_DIR}/../../../lib/common.sh"
-elif [ -f "${SCRIPT_DIR}/../../../../lib/common.sh" ]; then
-    # Repository layout: top-level lib/common.sh for development checks.
-    . "${SCRIPT_DIR}/../../../../lib/common.sh"
+_claw_lib=""
+for _claw_try in \
+    "${SCRIPT_DIR}/common.sh" \
+    "${SCRIPT_DIR}/../../../lib/common.sh" \
+    "${SCRIPT_DIR}/../../../../lib/common.sh" \
+    /root/payloads/lib/common.sh; do
+    # Portal self-contained, installed suite, repository checkout, then the
+    # canonical install path for a payload executed from outside its directory.
+    [ -f "$_claw_try" ] || continue
+    _claw_lib="$_claw_try"
+    break
+done
+unset _claw_try
+if [ -n "$_claw_lib" ]; then
+    # shellcheck source=/dev/null
+    . "$_claw_lib"
+    unset _claw_lib
 else
     ERROR_DIALOG "Install Error" "CLAWHunter common.sh was not found"
     exit 1
@@ -852,7 +880,7 @@ case "$resp" in
     "$DUCKYSCRIPT_USER_CONFIRMED")
         # Use the routed interface rather than assuming wlan0; fall back only
         # when route inspection provides no device name.
-        local_iface=$(ip route get 1.1.1.1 2>/dev/null | awk '/dev/{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}' | head -1)
+        local_iface=$(detect_default_iface)
         [ -z "$local_iface" ] && local_iface="wlan0"
         mac_randomize "$local_iface"
         ;;
@@ -895,16 +923,19 @@ sleep 1
 # Derive a convenient picker default from the active route without assuming a
 # fixed Pineapple/client subnet. The operator still explicitly confirms the full
 # target IPv4 address; CLAWHunter then bounds scanning to that address's /24.
-LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}' | head -1)
-if ! is_valid_ipv4 "$LOCAL_IP"; then
-    LOCAL_IP=$(ip -4 -o addr show 2>/dev/null | awk '$4 !~ /^127\./ {split($4,a,"/"); print a[1]; exit}')
-fi
+LOCAL_IP=$(detect_local_ipv4)
 DEFAULT_TARGET_IP="192.168.1.1"
 is_valid_ipv4 "$LOCAL_IP" && DEFAULT_TARGET_IP="$LOCAL_IP"
 LOG blue "Local IP: ${LOCAL_IP:-unknown}"
 sleep 1
 
 # ── Feature 10: Multi-subnet loop ─────────────────────────────────────────────
+# Consecutive rejected picker values before the payload gives up and exits
+# cleanly. Reset after every accepted value, so a genuine typo costs a retry
+# rather than the whole session.
+readonly MAX_BAD_INPUT=3
+BAD_INPUT=0
+
 while true; do
 
     # ── Subnet picker ──────────────────────────────────────────────
@@ -916,9 +947,22 @@ while true; do
             LOG red "Cancelled"; break ;;
     esac
     if ! is_valid_ipv4 "$TARGET_NETWORK_IP"; then
+        # Bounded retry. A bare `continue` here re-opens the picker forever, and
+        # on a device whose only surface is the screen an unbounded loop is
+        # indistinguishable from a hardware lockup -- it can only be escaped by
+        # a power cycle. Any condition that makes the picker keep returning an
+        # unusable value (EOF on a non-interactive run, a cancel whose status is
+        # not recognised, a firmware quirk) lands here, so cap it and leave.
+        BAD_INPUT=$((BAD_INPUT + 1))
+        if [ "$BAD_INPUT" -ge "$MAX_BAD_INPUT" ]; then
+            ERROR_DIALOG "Input Error" \
+                "No valid IPv4 after ${MAX_BAD_INPUT} attempts — exiting"
+            break
+        fi
         ERROR_DIALOG "Invalid IPv4" "$TARGET_NETWORK_IP"
         continue
     fi
+    BAD_INPUT=0
     SUBNET=$(subnet_prefix_from_ip "$TARGET_NETWORK_IP")
 
     # ── Port picker ────────────────────────────────────────────────
@@ -930,9 +974,17 @@ while true; do
             LOG red "Cancelled"; break ;;
     esac
     if ! is_valid_port "$TARGET_PORT"; then
+        # Same bound as the IPv4 picker above, for the same reason.
+        BAD_INPUT=$((BAD_INPUT + 1))
+        if [ "$BAD_INPUT" -ge "$MAX_BAD_INPUT" ]; then
+            ERROR_DIALOG "Input Error" \
+                "No valid port after ${MAX_BAD_INPUT} attempts — exiting"
+            break
+        fi
         ERROR_DIALOG "Invalid Port" "$TARGET_PORT"
         continue
     fi
+    BAD_INPUT=0
 
     # ── Advanced options (skip for AGGRESSIVE — already set by profile) ───────
     if [ "$SCAN_PROFILE" != "AGGRESSIVE" ]; then

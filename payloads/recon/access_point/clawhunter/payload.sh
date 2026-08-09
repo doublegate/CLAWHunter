@@ -8,7 +8,7 @@
 # For the Hak5 WiFi Pineapple Pager — Runs from Recon UI against a selected AP
 # =============================================================================
 #
-# PAYLOAD_VERSION: 3.3.0
+# PAYLOAD_VERSION: 3.4.0
 # AUTHOR:  doublegate
 # REPO:    https://github.com/doublegate/CLAWHunter
 #
@@ -37,7 +37,7 @@
 #   Exit   - disconnect and clear the client configuration on every path.
 # =============================================================================
 
-readonly PAYLOAD_VERSION="3.3.0"
+readonly PAYLOAD_VERSION="3.4.0"
 # 18789 is current; 18790 remains a bounded legacy secondary probe in Recon.
 readonly OPENCLAW_DEFAULT_PORT=18789
 readonly LOOT_BASE="/root/loot/clawhunter"
@@ -45,18 +45,46 @@ readonly WIFI_IF="wlan0cli"
 
 # Resolve common.sh in three supported layouts: self-contained Portal payload,
 # installed suite (/root/payloads/lib), and repository checkout for development.
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLAWHUNTER_PAYLOAD_DIR="$SCRIPT_DIR"
+# Locate this payload's own directory. The Pager firmware copies payload.sh to
+# /tmp/payload-<random>.sh and executes the copy, so "$0" -- and BASH_SOURCE with
+# it -- names a temp file with no payload resources beside it. Resolving from
+# "$0" alone therefore fails on every UI launch, which is the one path operators
+# actually use. The firmware compensates by exporting _PAYLOAD_HOME and by
+# setting the working directory to the payload directory; prefer those, then
+# fall back to "$0" so manual, repository, and staged invocations still work.
+# A candidate only counts if it holds payload resources, so a stray PWD cannot
+# silently win.
+CLAWHUNTER_PAYLOAD_DIR=""
+for _claw_cand in "${_PAYLOAD_HOME:-}" "${PAYLOAD_HOME:-}" "$PWD" "$(dirname "$0")"; do
+    [ -n "$_claw_cand" ] && [ -d "$_claw_cand" ] || continue
+    if [ -f "${_claw_cand}/common.sh" ] || [ -f "${_claw_cand}/payload.sh" ]; then
+        CLAWHUNTER_PAYLOAD_DIR="$(cd "$_claw_cand" && pwd)"
+        break
+    fi
+done
+unset _claw_cand
+# Last resort keeps the relative-layout probes below meaningful even when no
+# candidate identified itself.
+[ -n "$CLAWHUNTER_PAYLOAD_DIR" ] || CLAWHUNTER_PAYLOAD_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$CLAWHUNTER_PAYLOAD_DIR"
 export CLAWHUNTER_PAYLOAD_DIR
-if [ -f "${SCRIPT_DIR}/common.sh" ]; then
-    # Release/Portal layout: payload resources are self-contained.
-    . "${SCRIPT_DIR}/common.sh"
-elif [ -f "${SCRIPT_DIR}/../../../lib/common.sh" ]; then
-    # Installed suite layout: /root/payloads/lib/common.sh.
-    . "${SCRIPT_DIR}/../../../lib/common.sh"
-elif [ -f "${SCRIPT_DIR}/../../../../lib/common.sh" ]; then
-    # Repository layout: top-level lib/common.sh for development checks.
-    . "${SCRIPT_DIR}/../../../../lib/common.sh"
+_claw_lib=""
+for _claw_try in \
+    "${SCRIPT_DIR}/common.sh" \
+    "${SCRIPT_DIR}/../../../lib/common.sh" \
+    "${SCRIPT_DIR}/../../../../lib/common.sh" \
+    /root/payloads/lib/common.sh; do
+    # Portal self-contained, installed suite, repository checkout, then the
+    # canonical install path for a payload executed from outside its directory.
+    [ -f "$_claw_try" ] || continue
+    _claw_lib="$_claw_try"
+    break
+done
+unset _claw_try
+if [ -n "$_claw_lib" ]; then
+    # shellcheck source=/dev/null
+    . "$_claw_lib"
+    unset _claw_lib
 else
     ERROR_DIALOG "Install Error" "CLAWHunter common.sh was not found"
     exit 1
@@ -194,7 +222,9 @@ READY=0
 for _i in $(seq 1 30); do
     # Query only wlan0cli. An address on management/PineAP interfaces must not
     # be mistaken for successful association to the selected target AP.
-    CIDR=$(ip -4 -o addr show dev "$WIFI_IF" 2>/dev/null | awk '{print $4}' | head -1)
+    # BusyBox `ip` accepts -o and -f inet but not -4; use the portable form so
+    # this resolves on the Pager as well as on a full-iproute2 host.
+    CIDR=$(ip -o -f inet addr show dev "$WIFI_IF" 2>/dev/null | awk '{print $4}' | head -1)
     if [ -n "$CIDR" ]; then READY=1; break; fi
     sleep 1
 done

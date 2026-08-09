@@ -2,13 +2,13 @@
 
 <img src="images/pager-transparent.png" width="450" alt="WiFi Pineapple Pager">
 
-CLAWHunter v3.3.0 is a Hak5 WiFi Pineapple Pager payload suite for finding and assessing OpenClaw gateways on an authorized local network. The interactive, recon-triggered, and client-connected alert payloads share one evidence-based fingerprinting library and integrate with the Pager display, LEDs, haptics, audio, and loot browser.
+CLAWHunter v3.4.0 is a Hak5 WiFi Pineapple Pager payload suite for finding and assessing OpenClaw gateways on an authorized local network. The interactive, recon-triggered, and client-connected alert payloads share one evidence-based fingerprinting library and integrate with the Pager display, LEDs, haptics, audio, and loot browser.
 
 Use this project only on systems and networks you own or are explicitly authorized to assess.
 
 ![Platform](https://img.shields.io/badge/platform-WiFi%20Pineapple%20Pager-red)
 ![Language](https://img.shields.io/badge/language-Bash%20%2B%20Python3-yellow)
-![Version](https://img.shields.io/badge/version-3.3.0-green)
+![Version](https://img.shields.io/badge/version-3.4.0-green)
 
 ![CLAWHunter architecture](images/architecture.png)
 
@@ -58,7 +58,7 @@ CLAWHunter bootstraps `/mmc/bin`, `/mmc/sbin`, `/mmc/usr/bin`, `/mmc/usr/sbin`, 
 | 1.0.8 | Not recommended for v3.3 | Added list picker, payload metadata, and line-ending rewriting, but predates later context fixes |
 | 1.0.7 and older | Unsupported for v3.3 | Missing later payload-context and Portal fixes |
 
-The payloads keep local/shared-library fallback resolution rather than relying on `_PAYLOAD_HOME`, so manual, Portal, and repository layouts remain testable. Firmware-specific details and every reviewed changelog are recorded in [docs/V3.3-RESEARCH.md](docs/V3.3-RESEARCH.md).
+The payloads resolve their resource directory from `_PAYLOAD_HOME` first, then `PAYLOAD_HOME`, `PWD`, and finally `dirname "$0"`, taking the first candidate that actually contains payload resources. The firmware copies a payload to `/tmp/payload-<random>.sh` and executes the copy, so `$0` names a temp file with no resources beside it; `_PAYLOAD_HOME` is the only authoritative source under the launcher operators actually use. The later candidates keep manual, Portal, and repository layouts testable. Firmware-specific details and every reviewed changelog are recorded in [docs/V3.3-RESEARCH.md](docs/V3.3-RESEARCH.md).
 
 ## Repository Structure
 
@@ -96,7 +96,7 @@ The repository stores one canonical `lib/common.sh`. The release packager embeds
 
 ## Install
 
-Download and unpack `clawhunter-v3.3.0-pager.tar.gz` from the GitHub release, transfer the directory to the Pager, then run:
+Download and unpack `clawhunter-v3.4.0-pager.tar.gz` from the GitHub release, transfer the directory to the Pager, then run:
 
 ```bash
 ./scripts/install-pager.sh
@@ -124,9 +124,9 @@ The release includes a `SHA256SUMS` manifest inside the archive and a separate `
 ### Verify the release
 
 ```bash
-sha256sum -c clawhunter-v3.3.0-pager.tar.gz.sha256
-tar -xzf clawhunter-v3.3.0-pager.tar.gz
-cd clawhunter-v3.3.0
+sha256sum -c clawhunter-v3.4.0-pager.tar.gz.sha256
+tar -xzf clawhunter-v3.4.0-pager.tar.gz
+cd clawhunter-v3.4.0
 sha256sum -c SHA256SUMS
 ```
 
@@ -137,8 +137,8 @@ The external checksum validates the downloaded archive. The internal manifest va
 One manual transfer flow is:
 
 ```bash
-scp -r clawhunter-v3.3.0 root@pineapple.lan:/tmp/
-ssh root@pineapple.lan '/tmp/clawhunter-v3.3.0/scripts/install-pager.sh'
+scp -r clawhunter-v3.4.0 root@pineapple.lan:/tmp/
+ssh root@pineapple.lan '/tmp/clawhunter-v3.4.0/scripts/install-pager.sh'
 ```
 
 The installer accepts an alternate destination as its first argument. This is used by the automated gate and can also stage the exact Pager tree on another mounted filesystem:
@@ -327,7 +327,7 @@ printf '%s\n' 'authorized-gateway-secret' > /root/.config/clawhunter/gateway-tok
 chmod 600 /root/.config/clawhunter/gateway-token
 ```
 
-OpenClaw treats this shared secret as full operator authority. Protect it accordingly. Without a credential, authentication-required targets are reported without bypass attempts. The obsolete unauthenticated agent-command and out-of-band exfiltration behavior is not present in v3.3.0.
+OpenClaw treats this shared secret as full operator authority. Protect it accordingly. Without a credential, authentication-required targets are reported without bypass attempts. The obsolete unauthenticated agent-command and out-of-band exfiltration behavior is not present in v3.4.0.
 
 ### Assessment phases
 
@@ -381,7 +381,7 @@ Confirmed instances include their scheme, port, evidence class, confidence score
 ```json
 {
   "scan_id": "20260806_120000",
-  "payload_version": "3.3.0",
+  "payload_version": "3.4.0",
   "subnet": "192.0.2.1-254",
   "hosts_scanned": 12,
   "elapsed_seconds": 34,
@@ -456,7 +456,7 @@ This is intentional. A reachable HTTP service, health endpoint, 401/403 response
 
 ### Assessment says authentication required
 
-- v3.3.0 does not guess or bypass credentials.
+- v3.4.0 does not guess or bypass credentials.
 - Provide an explicitly authorized gateway secret through the protected file or environment.
 - Treat the secret as full gateway operator authority.
 - A 404 or `UNAVAILABLE` tool result may reflect OpenClaw tool policy rather than network failure.

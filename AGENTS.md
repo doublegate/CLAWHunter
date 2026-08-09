@@ -46,10 +46,20 @@
 
 ### Gotchas / institutional knowledge
 
-- **A version bump touches 11 files.** Six carry runtime declarations that `check.sh` parses into one unified value (`lib/common.sh`, the three `payload.sh` files, `harvest.py`, `scripts/package-release.sh`); four are user-facing surfaces asserted as exact strings (`README.md`'s `version-3.3.0-green` badge, `CHANGELOG.md`'s `^## [v3.3.0] - <date>$` **including the date**, `scripts/install-pager.sh`, `docs/architecture.dot`); and `check.sh` itself hard-codes the expected value so an accidental *unified* downgrade still fails. Count files, not occurrences — several files hold more than one (`check.sh` has 10, `README.md` 11). Bumping only the runtime declarations fails the gate.
+- **A version bump touches 11 files.** Six carry runtime declarations that `check.sh` parses into one unified value (`lib/common.sh`, the three `payload.sh` files, `harvest.py`, `scripts/package-release.sh`); four are user-facing surfaces asserted as exact strings (`README.md`'s `version-3.4.0-green` badge, `CHANGELOG.md`'s `^## [v3.4.0] - <date>$` **including the date**, `scripts/install-pager.sh`, `docs/architecture.dot`); and `check.sh` itself hard-codes the expected value so an accidental *unified* downgrade still fails. Count files, not occurrences — several files hold more than one (`check.sh` has 10, `README.md` 11). Bumping only the runtime declarations fails the gate.
 - **The gate is not BusyBox-constrained.** `scripts/check.sh` needs `shellcheck`, `rg` (ripgrep), `curl`, and `nc` (netcat) on the *host*. The stdlib-only / BusyBox-compatible rule governs shipped payload code, not the gate. A missing `nc` surfaces only as `FAIL: loopback classifier probe failed` — `probe_openclaw` gates on `nc -z` (`lib/common.sh:229`) — which reads like a classifier bug rather than an absent tool. CI never hits this because `ubuntu-latest` ships netcat.
 - **Checkpoint parity:** sequential and parallel scan paths must both skip and write `/tmp/clawhunter_checkpoint_<subnet>_<port-key>` entries only after every selected port finishes (CONTRIBUTING contract 6).
 - **How that parity is enforced.** `check.sh:46` asserts *exactly two* literal `checkpoint_mark "$CHECKPOINT_FILE"` call sites in the user `payload.sh` — a textual proxy for the rule above, and one that fails *silently*: `set -e` on a bare `[ ]` prints nothing, so the gate just stops after the unit tests and reads like a truncated pass. Any refactor that moves those calls trips it, and the count cannot tell a harmless one from a harmful one. Funnelling both through a wrapper that reads `CHECKPOINT_FILE` from an enclosing scope, for instance, passes every existing test while silently dropping resume records for any future caller outside that scope. Deciding which kind you have is a human's job, which is the whole point of pinning it structurally. Outside a release you may re-point the assertion at the new call sites in the same commit; loosening it to `-eq 1` or deleting it is never a resolution. **During a release, do neither** — see `.claude/skills/release/SKILL.md`; a gate that fails while cutting a version is a finding to report.
+- **The firmware does not run your payload file — it runs a rewritten copy.** Verified on a Pager (OpenWrt 24.10.1) by capturing a real UI launch. `/pineapple/pineapple` prepends a prelude and writes the result to `/tmp/payload-<random>.sh`, then executes that:
+  ```bash
+  #!/bin/bash
+  PATH="$PATH:/mmc/bin:/mmc/sbin:/mmc/usr/bin:/mmc/usr/sbin"
+  . /lib/hak5/commands.sh
+  . /lib/hak5/pineapple.sh
+  ```
+  Three consequences. **(1)** `$0` *and* `BASH_SOURCE[0]` both name the temp file, so a payload cannot locate its own `common.sh`/`harvest.py` from either — resolve from `_PAYLOAD_HOME` (exported) or `PWD` (set to the payload directory) instead. **(2)** The `DUCKYSCRIPT_*` status constants (`USER_DENIED=0`, `USER_CONFIRMED=1`, `CANCELLED=2`, `REJECTED=3`, `ERROR=4`) come from that prelude as **non-exported shell variables** — they are real and comparisons against them work, but `env` will not show them, so don't conclude from an `env` dump that they are missing. **(3)** eMMC paths are already on `PATH` before the payload starts.
+- **The device's `ip` is BusyBox (`/sbin/ip` -> `/bin/busybox`, 1.36.1), but it is not as limited as its usage string implies.** `route get`, `-4`, `-o`, `-f inet`, `neigh show` and `link set` all work; `-br` does not, and BusyBox prints a *generic usage block* for an unsupported option rather than naming it. Do not infer which subcommands exist from that block — it lists far less than the applet implements, and reasoning from it produced a wrong bug report during v3.4.0. Test the actual call on the device. Prefer `detect_local_ipv4` / `detect_default_iface` in `lib/common.sh`, which layer fallbacks and validate every candidate.
+- **Never `continue` unbounded after a rejected picker value.** The device's only surface is the screen; an unbounded retry loop redraws a dialog forever and is indistinguishable from a hardware lockup, escapable only by power-cycling. Cap consecutive rejections and exit cleanly (`MAX_BAD_INPUT` in the user payload).
 - **IPv6/IPv4 sort collision:** never pipe IPv6 addresses through the IPv4 dot-field sort (`sort -t. -k4 -n`); sort IPv6 separately with `sort -u`.
 - `harvest.py` enforces one 180s global ceiling across transport discovery, health/readiness, WebSocket challenge, authorized read-only tools, and reporting; it returns partial results rather than hanging.
 
@@ -62,5 +72,5 @@
 
 ### Status / next
 
-- `main` is the Pager suite at **v3.3.0**.
+- `main` is the Pager suite at **v3.4.0**.
 <<< MC-PROJECT-END >>>

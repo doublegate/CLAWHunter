@@ -71,4 +71,4 @@ jobs:
             dist/clawhunter-v*-pager.tar.gz.sha256 \
             --verify-tag \
             --title "CLAWHunter $RELEASE_TAG" \
-            --notes-file docs/V3.3-RELEASE-NOTES.md
+            --notes-file docs/V3.4-RELEASE-NOTES.md
