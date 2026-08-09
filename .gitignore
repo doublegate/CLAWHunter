@@ -2,6 +2,17 @@
 *.log
 loot/
 
+# Local release builds. scripts/package-release.sh writes the archive and its
+# checksum into the directory it is given; the documented local command uses
+# `dist`. Release artifacts are published from the tag by CI, never from here.
+dist/
+
+# Per-developer Claude Code state. Shared agent guidance lives in AGENTS.md and
+# .claude/skills/; settings.local.json is a personal permission allowlist, and
+# the .tmp.* files are its interrupted-write artifacts.
+.claude/settings.local.json
+.claude/*.tmp.*
+
 # Editor
 .vscode/
 .idea/
