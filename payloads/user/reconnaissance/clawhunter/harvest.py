@@ -408,7 +408,16 @@ def main() -> int:
     output = Path(args.out).expanduser().resolve()
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(render_report(report), encoding="utf-8")
+        # The report names third-party hosts and the evidence gathered from them.
+        # payload.sh sets umask 077 before invoking this engine, but README
+        # documents running it directly, so do not rely on the caller's umask.
+        # Create the file 0600 up front: writing first and chmod-ing after would
+        # leave the evidence briefly world-readable.
+        fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(render_report(report))
+        # An existing report from an earlier run keeps its original mode.
+        os.chmod(output, 0o600)
     except OSError as exc:
         print(f"harvest.py: failed to write {output}: {exc}", file=sys.stderr)
         return 3

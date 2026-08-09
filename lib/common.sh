@@ -20,7 +20,18 @@
 : "${FOUND_COUNT:=0}"
 : "${LOG_FILE:=}"
 
+# Loot records confirmed gateways, candidate hosts, and harvested evidence about
+# third-party systems, so it is operator-sensitive even though the Pager is a
+# single-root device. Restrict before the first write rather than after: a chmod
+# that follows creation leaves a window where the file is world-readable, and on
+# a device that may be shared, imaged, or exported that window is the whole risk.
+# 077 also covers the checkpoint files and any child process the payload spawns,
+# including harvest.py, which inherits this umask.
+umask 077
 mkdir -p "$LOOT_BASE"
+# mkdir honours the umask only for directories it creates; an existing loot
+# directory from an earlier release keeps its old mode, so set it explicitly.
+chmod 0700 "$LOOT_BASE" 2>/dev/null || true
 declare -ag MDNS_CANDIDATES=()
 
 # -- Pager feedback -----------------------------------------------------------
