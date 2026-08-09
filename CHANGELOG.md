@@ -6,10 +6,30 @@ All notable changes to CLAWHunter are documented here.
 
 ## [v3.4.0] - 2026-08-09
 
-Security and release-integrity maintenance. No new operator-facing features and
-no protocol changes; the fingerprinting, scan, and assessment behaviour of
-v3.3.0 is unchanged. Two of the three fixes alter how files are written on the
-device, so an upgrade is recommended for anyone whose Pager stores loot.
+Fixes the interactive payload, which could not run from the Pager UI in any
+earlier release, plus loot permissions and cross-host reproducible packaging.
+No protocol changes: fingerprinting, scan, and assessment behaviour is unchanged
+from v3.3.0. **Upgrading is strongly recommended** — on v3.3.0 the user payload
+fails immediately when launched from the device.
+
+### Fixed — payload could not launch from the Pager UI
+- **`payload.sh` could not locate `common.sh` when started from the device**,
+  failing instantly with `Install Error / CLAWHunter common.sh was not found`.
+  The firmware does not execute the installed file: it prepends a prelude,
+  writes the result to `/tmp/payload-<random>.sh`, and runs that copy. All three
+  payloads derived their resource directory from `$0`, which therefore named a
+  temp file with no resources beside it, so every branch of the resolution chain
+  missed. `BASH_SOURCE` would not have helped — the firmware copies the file, so
+  it names the same temp path. Resolution now prefers `_PAYLOAD_HOME`, then
+  `PAYLOAD_HOME`, `PWD`, and finally `dirname "$0"`, taking the first candidate
+  that actually holds payload resources, with `/root/payloads/lib/common.sh` as
+  an absolute last resort. Manual, Portal, and repository layouts still work.
+- **A rejected picker value looped forever.** The IPv4 and port pickers ended an
+  invalid value with an unbounded `continue`, redrawing the error dialog with no
+  exit. On a device whose only surface is the screen that is indistinguishable
+  from a hardware lockup and escapable only by power-cycling. Consecutive
+  rejections are now capped at three, after which the payload exits cleanly with
+  a stated reason; the counter resets on every accepted value.
 
 ### Security
 - **Loot is no longer world-readable.** Scan output names third-party hosts and
