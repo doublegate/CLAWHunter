@@ -31,7 +31,15 @@ umask 077
 mkdir -p "$LOOT_BASE"
 # mkdir honours the umask only for directories it creates; an existing loot
 # directory from an earlier release keeps its old mode, so set it explicitly.
-chmod 0700 "$LOOT_BASE" 2>/dev/null || true
+# Fail closed and loudly: this is the boundary that keeps scan evidence off a
+# shared or imaged device, and a swallowed failure here would leave a
+# world-readable directory with nothing to indicate it. Exiting is deliberate --
+# `return` would merely end the `source` and let the payload run on unprotected.
+if ! chmod 0700 "$LOOT_BASE"; then
+    printf 'CLAWHunter: refusing to run: cannot secure loot directory %s\n' \
+        "$LOOT_BASE" >&2
+    exit 1
+fi
 declare -ag MDNS_CANDIDATES=()
 
 # -- Pager feedback -----------------------------------------------------------
