@@ -20,10 +20,6 @@ All notable changes to CLAWHunter are documented here.
 - `scripts/check.sh` now asserts the release manifest is in C-locale byte order.
   Its existing two-build comparison runs on one host under one locale and so
   cannot detect collation drift by construction.
-- Both CI workflows now install the gate's host tools explicitly
-  (`shellcheck`, `ripgrep`, `netcat-openbsd`, `curl`) instead of relying on the
-  runner image, so a missing tool fails at install time rather than surfacing as
-  `FAIL: loopback classifier probe failed`.
 
 ---
 
