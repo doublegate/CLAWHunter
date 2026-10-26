@@ -16,7 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Pin the major official action; repository contents are read-only here.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Install host gate dependencies
         # scripts/check.sh needs shellcheck, rg, curl and nc on the host (payload
         # Python remains standard-library-only). ubuntu-latest currently ships
