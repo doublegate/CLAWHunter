@@ -27,11 +27,12 @@ jobs:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # A manual run must build the tag rather than the current default head.
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install release gate dependencies
         # Payload Python remains standard-library-only, but the host gate also

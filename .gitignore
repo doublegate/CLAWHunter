@@ -10,6 +10,7 @@ dist/
 # Per-developer Claude Code state. Shared agent guidance lives in AGENTS.md and
 # .claude/skills/; settings.local.json is a personal permission allowlist, and
 # the .tmp.* files are its interrupted-write artifacts.
+CLAUDE.local.md
 .claude/settings.local.json
 .claude/*.tmp.*
 
